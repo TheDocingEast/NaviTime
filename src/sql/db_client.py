@@ -116,11 +116,11 @@ class DBClient:
         self.connection.close()
 
 
-dbclient = DBClient(
-    dbname="navitime",
-    user="navitime",
-    password="ghio#21d",
-    host="85.209.135.157"
-)
+# dbclient = DBClient(
+#     dbname="navitime",
+#     user="navitime",
+#     password="ghio#21d",
+#     host="85.209.135.157"
+# )
 
-dbclient.get_workspaces()
+# dbclient.get_workspaces()
