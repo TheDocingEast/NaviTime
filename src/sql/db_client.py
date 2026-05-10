@@ -19,16 +19,33 @@ class DBClient:
         self.connection = psycopg2.connect(f"dbname={self.dbname} user={self.user} password={self.password} host={self.host}")
         self.connection.autocommit = False
 
-    # ── Workspaces ──────────────────────────────────────────
+    # ── Workspaces ───────────────────────────────────────────
     def get_workspaces(self):
-        return self._fetch("SELECT * FROM workspaces")
+        return self._fetch("SELECT * FROM workspaces ORDER BY workspace_id")
+
+    def get_workspace_by_id(self, workspace_id):
+        return self._fetch_one("SELECT * FROM workspaces WHERE workspace_id = %s", (workspace_id,))
+
+    def create_workspace(self, name):
+        self._execute("INSERT INTO workspaces (name) VALUES (%s)", (name,))
+
+    def delete_workspace(self, workspace_id):
+        self._execute("DELETE FROM workspaces WHERE workspace_id = %s", (workspace_id,))
 
     # ── Users ────────────────────────────────────────────────
-    def get_user(self, username, password_hash):
+    def get_user_by_username(self, username):
         return self._fetch_one(
-            "SELECT * FROM users WHERE username = %s AND password = %s AND is_active = TRUE",
-            (username, password_hash)
+            "SELECT * FROM users WHERE username = %s AND is_active = TRUE",
+            (username,)
         )
+
+    def get_all_users(self):
+        return self._fetch("""
+            SELECT u.*, w.name AS workspace_name
+            FROM users u
+            LEFT JOIN workspaces w ON u.workspace_id = w.workspace_id
+            ORDER BY u.user_id
+        """)
 
     def get_users_by_workspace(self, workspace_id):
         return self._fetch(
@@ -36,57 +53,16 @@ class DBClient:
             (workspace_id,)
         )
 
-    # ── Tasks ────────────────────────────────────────────────
-    def get_tasks(self, workspace_id):
-        return self._fetch(
-            "SELECT * FROM tasks WHERE workspace_id = %s AND is_deleted = FALSE ORDER BY priority DESC",
-            (workspace_id,)
-        )
-
-    def get_hot_task(self, workspace_id):
-        """Горящая задача — ближайший дедлайн"""
-        return self._fetch_one(
-            "SELECT * FROM tasks WHERE workspace_id = %s AND deadline IS NOT NULL "
-            "AND is_deleted = FALSE ORDER BY deadline ASC LIMIT 1",
-            (workspace_id,)
-        )
-
-    def create_task(self, title, description, workspace_id, status_id, creator_id, priority, deadline):
+    def create_user(self, username, full_name, password, role, workspace_id=None):
         self._execute(
-            "INSERT INTO tasks (title, description, workspace_id, status_id, creator_id, priority, deadline) "
-            "VALUES (%s, %s, %s, %s, %s, %s, %s)",
-            (title, description, workspace_id, status_id, creator_id, priority, deadline)
+            "INSERT INTO users (username, full_name, password, role, workspace_id) VALUES (%s, %s, %s, %s, %s)",
+            (username, full_name, password, role, workspace_id)
         )
 
-    def update_task_status(self, task_id, status_id):
+    def set_user_active(self, user_id, is_active):
         self._execute(
-            "UPDATE tasks SET status_id = %s WHERE task_id = %s",
-            (status_id, task_id)
-        )
-
-    def update_task_priority(self, task_id, priority):
-        self._execute(
-            "UPDATE tasks SET priority = %s WHERE task_id = %s",
-            (priority, task_id)
-        )
-
-    def soft_delete_task(self, task_id):
-        self._execute(
-            "UPDATE tasks SET is_deleted = TRUE WHERE task_id = %s",
-            (task_id,)
-        )
-
-    # ── Comments ─────────────────────────────────────────────
-    def get_comments(self, task_id):
-        return self._fetch(
-            "SELECT * FROM comments WHERE task_id = %s ORDER BY created_at ASC",
-            (task_id,)
-        )
-
-    def add_comment(self, task_id, author_id, body):
-        self._execute(
-            "INSERT INTO comments (task_id, author_id, body) VALUES (%s, %s, %s)",
-            (task_id, author_id, body)
+            "UPDATE users SET is_active = %s WHERE user_id = %s",
+            (is_active, user_id)
         )
 
     # ── Statuses ─────────────────────────────────────────────
@@ -96,7 +72,63 @@ class DBClient:
             (workspace_id,)
         )
 
-    # ── Вспомогательные методы ───────────────────────────────
+    # ── Tasks ────────────────────────────────────────────────
+    def get_tasks(self, workspace_id):
+        return self._fetch("""
+            SELECT t.*, u.username AS assignee_name
+            FROM tasks t
+            LEFT JOIN users u ON t.assignee_id = u.user_id
+            WHERE t.workspace_id = %s AND t.is_deleted = FALSE
+            ORDER BY t.priority DESC, t.created_at ASC
+        """, (workspace_id,))
+
+    def get_task_by_id(self, task_id):
+        return self._fetch_one("""
+            SELECT t.*, u.username AS assignee_name
+            FROM tasks t
+            LEFT JOIN users u ON t.assignee_id = u.user_id
+            WHERE t.task_id = %s
+        """, (task_id,))
+
+    def get_hot_task(self, workspace_id):
+        return self._fetch_one("""
+            SELECT * FROM tasks
+            WHERE workspace_id = %s AND deadline IS NOT NULL AND is_deleted = FALSE
+            ORDER BY deadline ASC LIMIT 1
+        """, (workspace_id,))
+
+    def create_task(self, title, description, workspace_id, status_id, creator_id, priority, deadline):
+        self._execute(
+            """INSERT INTO tasks (title, description, workspace_id, status_id, creator_id, priority, deadline)
+                VALUES (%s, %s, %s, %s, %s, %s, %s)""",
+            (title, description, workspace_id, status_id, creator_id, priority, deadline)
+        )
+
+    def update_task_status(self, task_id, status_id):
+        self._execute("UPDATE tasks SET status_id = %s WHERE task_id = %s", (status_id, task_id))
+
+    def update_task_priority(self, task_id, priority):
+        self._execute("UPDATE tasks SET priority = %s WHERE task_id = %s", (priority, task_id))
+
+    def soft_delete_task(self, task_id):
+        self._execute("UPDATE tasks SET is_deleted = TRUE WHERE task_id = %s", (task_id,))
+
+    # ── Comments ─────────────────────────────────────────────
+    def get_comments(self, task_id):
+        return self._fetch("""
+            SELECT c.*, u.username AS author_name
+            FROM comments c
+            JOIN users u ON c.author_id = u.user_id
+            WHERE c.task_id = %s ORDER BY c.created_at ASC
+        """, (task_id,))
+
+    def add_comment(self, task_id, author_id, body):
+        self._execute(
+            "INSERT INTO comments (task_id, author_id, body) VALUES (%s, %s, %s)",
+            (task_id, author_id, body)
+        )
+
+    # ── Helpers ──────────────────────────────────────────────
     def _fetch(self, query, params=None):
         with self.connection.cursor(cursor_factory=RealDictCursor) as cur:
             cur.execute(query, params)
@@ -114,13 +146,3 @@ class DBClient:
 
     def close(self):
         self.connection.close()
-
-
-# dbclient = DBClient(
-#     dbname="navitime",
-#     user="navitime",
-#     password="ghio#21d",
-#     host="85.209.135.157"
-# )
-
-# dbclient.get_workspaces()
