@@ -128,6 +128,21 @@ class DBClient:
             (task_id, author_id, body)
         )
 
+    # ── Statuses ───────────────────────────────────
+    def create_status(self, workspace_id, name, color):
+        # position = следующий после максимального
+        result = self._fetch_one(
+            "SELECT COALESCE(MAX(position), 0) + 1 AS next_pos FROM statuses WHERE workspace_id = %s",
+            (workspace_id,)
+        )
+        self._execute(
+            "INSERT INTO statuses (workspace_id, name, position, color) VALUES (%s, %s, %s, %s)",
+            (workspace_id, name, result["next_pos"], color)
+        )
+
+    def delete_status(self, status_id):
+        self._execute("DELETE FROM statuses WHERE status_id = %s", (status_id,))
+
     # ── Helpers ──────────────────────────────────────────────
     def _fetch(self, query, params=None):
         with self.connection.cursor(cursor_factory=RealDictCursor) as cur:

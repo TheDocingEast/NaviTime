@@ -4,6 +4,7 @@ import QtQuick.Layouts
 
 Rectangle {
     id: root
+    anchors.fill: parent
     color: "#2E3440"
 
     readonly property color nord0:  "#2E3440"
@@ -64,7 +65,7 @@ Rectangle {
                 border.color: nord3; border.width: 1
                 Behavior on color { ColorAnimation { duration: 100 } }
                 Text { anchors.centerIn: parent; text: "⏻"; color: nord11; font.pixelSize: 14 }
-                MouseArea { id: logoutArea; anchors.fill: parent; hoverEnabled: true; onClicked: stack.pop() }
+                MouseArea { id: logoutArea; anchors.fill: parent; hoverEnabled: true; onClicked: root.pop() }
             }
         }
     }
@@ -90,7 +91,7 @@ Rectangle {
             spacing: 2
 
             Text {
-                text: "// УПРАВЛЕНИЕ"
+                text: "// CONTROL PANEL"
                 color: nord3
                 font.family: "Monaspace Krypton"
                 font.pixelSize: 10
@@ -199,11 +200,11 @@ Rectangle {
                         model: [
                             { label: "ID",          w: 50  },
                             { label: "USERNAME",    w: 160 },
-                            { label: "NAME",        w: 200 },
+                            { label: "NAME",         w: 200 },
                             { label: "ROLE",        w: 120 },
                             { label: "WORKSPACE",   w: 130 },
                             { label: "STATUS",      w: 100 },
-                            { label: "ACTION",      w: 120 },
+                            { label: "ACTIONS",    w: 150 },
                         ]
 
                         Text {
@@ -229,42 +230,72 @@ Rectangle {
                     width: parent.width
                     spacing: 2
 
-                    // Вместо Repeater с динамическими id — просто три поля явно:
+                    Repeater {
+                        model: backend.users
 
-                    Text { text: "username"; color: "#4C566A"; font.family: "Monaspace Krypton"; font.pixelSize: 11 }
-                    Rectangle {
-                        Layout.fillWidth: true; height: 36
-                        color: "#2E3440"; border.color: "#434C5E"; border.width: 1
-                        TextInput {
-                            id: uField
-                            anchors.fill: parent; anchors.margins: 10
-                            color: "#D8DEE9"; font.family: "Monaspace Krypton"; font.pixelSize: 13
-                            verticalAlignment: TextInput.AlignVCenter
-                        }
-                    }
+                        Rectangle {
+                            width: parent.width
+                            height: 38
+                            color: rowArea.containsMouse ? nord2 : (index % 2 === 0 ? nord1 : "#363D4E")
+                            Behavior on color { ColorAnimation { duration: 80 } }
 
-                    Text { text: "full name"; color: "#4C566A"; font.family: "Monaspace Krypton"; font.pixelSize: 11 }
-                    Rectangle {
-                        Layout.fillWidth: true; height: 36
-                        color: "#2E3440"; border.color: "#434C5E"; border.width: 1
-                        TextInput {
-                            id: nField
-                            anchors.fill: parent; anchors.margins: 10
-                            color: "#D8DEE9"; font.family: "Monaspace Krypton"; font.pixelSize: 13
-                            verticalAlignment: TextInput.AlignVCenter
-                        }
-                    }
+                            Row {
+                                anchors.fill: parent
+                                anchors.leftMargin: 12
 
-                    Text { text: "password"; color: "#4C566A"; font.family: "Monaspace Krypton"; font.pixelSize: 11 }
-                    Rectangle {
-                        Layout.fillWidth: true; height: 36
-                        color: "#2E3440"; border.color: "#434C5E"; border.width: 1
-                        TextInput {
-                            id: pField
-                            anchors.fill: parent; anchors.margins: 10
-                            color: "#D8DEE9"; font.family: "Monaspace Krypton"; font.pixelSize: 13
-                            echoMode: TextInput.Password
-                            verticalAlignment: TextInput.AlignVCenter
+                                Text { width: 50;  height: parent.height; text: modelData.user_id;      color: nord3;  font.family: "Monaspace Krypton"; font.pixelSize: 12; verticalAlignment: Text.AlignVCenter }
+                                Text { width: 160; height: parent.height; text: modelData.username;     color: nord4;  font.family: "Monaspace Krypton"; font.pixelSize: 12; verticalAlignment: Text.AlignVCenter }
+                                Text { width: 200; height: parent.height; text: modelData.full_name;    color: nord4;  font.family: "Monaspace Krypton"; font.pixelSize: 12; verticalAlignment: Text.AlignVCenter; elide: Text.ElideRight }
+                                Text {
+                                    width: 120; height: parent.height
+                                    text: modelData.role
+                                    color: {
+                                        if (modelData.role === "admin")    return nord15
+                                        if (modelData.role === "manager")  return nord13
+                                        return nord9
+                                    }
+                                    font.family: "Monaspace Krypton"; font.pixelSize: 12; verticalAlignment: Text.AlignVCenter
+                                }
+                                Text { width: 130; height: parent.height; text: modelData.workspace_name ?? "—"; color: nord3; font.family: "Monaspace Krypton"; font.pixelSize: 12; verticalAlignment: Text.AlignVCenter }
+
+                                Rectangle {
+                                    width: 80; height: 20
+                                    anchors.verticalCenter: parent.verticalCenter
+                                    anchors.leftMargin: 10
+                                    color: modelData.is_active ? "#1A2E1A" : "#2E1A1A"
+                                    border.color: modelData.is_active ? nord14 : nord11; border.width: 1
+
+                                    Text {
+                                        anchors.centerIn: parent
+                                        text: modelData.is_active ? "ACTIVE" : "INACTIVE"
+                                        color: modelData.is_active ? nord14 : nord11
+                                        font.family: "Monaspace Krypton"; font.pixelSize: 9; font.letterSpacing: 1
+                                    }
+                                }
+
+                                // Toggle active button
+                                Rectangle {
+                                    width: 80; height: 24
+                                    anchors.verticalCenter: parent.verticalCenter
+                                    anchors.leftMargin: 10
+                                    color: toggleArea.containsMouse ? (modelData.is_active ? "#3B2A2A" : "#1A2E1A") : "transparent"
+                                    border.color: modelData.is_active ? nord11 : nord14; border.width: 1
+                                    Behavior on color { ColorAnimation { duration: 80 } }
+
+                                    Text {
+                                        anchors.centerIn: parent
+                                        text: modelData.is_active ? "INACTIVE" : "ACTIVE"
+                                        color: modelData.is_active ? nord11 : nord14
+                                        font.family: "Monaspace Krypton"; font.pixelSize: 9; font.letterSpacing: 1
+                                    }
+                                    MouseArea {
+                                        id: toggleArea; anchors.fill: parent; hoverEnabled: true
+                                        onClicked: backend.toggle_user_active(modelData.user_id, !modelData.is_active)
+                                    }
+                                }
+                            }
+
+                            MouseArea { id: rowArea; anchors.fill: parent; hoverEnabled: true; propagateComposedEvents: true }
                         }
                     }
                 }
@@ -281,7 +312,14 @@ Rectangle {
                 spacing: 12
                 Layout.fillWidth: true
 
-                Text { text: "// WORKSPACES"; color: nord15; font.family: "Monaspace Krypton"; font.pixelSize: 13; font.letterSpacing: 2 }
+                Text {
+                    text: "// WORKSPACES";
+                    color: nord15;
+                    font.family: "Monaspace Krypton";
+                    font.pixelSize: 13;
+                    font.letterSpacing: 2
+                    anchors.verticalCenter: parent.verticalCenter
+                }
 
                 Item { width: 1; height: 1; Layout.fillWidth: true }
 
@@ -381,30 +419,42 @@ Rectangle {
 
                 Text { text: "// NEW USER"; color: nord15; font.family: "Monaspace Krypton"; font.pixelSize: 11; font.letterSpacing: 3 }
 
-                Repeater {
-                    model: [
-                        { label: "username",    id: "u" },
-                        { label: "full name",  id: "n" },
-                        { label: "password",      id: "p" },
-                    ]
+                // Вместо Repeater с динамическими id — просто три поля явно:
 
-                    ColumnLayout {
-                        Layout.fillWidth: true; spacing: 4
+                Text { text: "username"; color: "#4C566A"; font.family: "Monaspace Krypton"; font.pixelSize: 11 }
+                Rectangle {
+                    Layout.fillWidth: true; height: 36
+                    color: "#2E3440"; border.color: "#434C5E"; border.width: 1
+                    TextInput {
+                        id: uField
+                        anchors.fill: parent; anchors.margins: 10
+                        color: "#D8DEE9"; font.family: "Monaspace Krypton"; font.pixelSize: 13
+                        verticalAlignment: TextInput.AlignVCenter
+                    }
+                }
 
-                        Text { text: modelData.label; color: nord3; font.family: "Monaspace Krypton"; font.pixelSize: 11 }
-                        Rectangle {
-                            Layout.fillWidth: true; height: 36
-                            color: nord0; border.color: nord2; border.width: 1
+                Text { text: "full name"; color: "#4C566A"; font.family: "Monaspace Krypton"; font.pixelSize: 11 }
+                Rectangle {
+                    Layout.fillWidth: true; height: 36
+                    color: "#2E3440"; border.color: "#434C5E"; border.width: 1
+                    TextInput {
+                        id: nField
+                        anchors.fill: parent; anchors.margins: 10
+                        color: "#D8DEE9"; font.family: "Monaspace Krypton"; font.pixelSize: 13
+                        verticalAlignment: TextInput.AlignVCenter
+                    }
+                }
 
-                            TextInput {
-                                property string fieldId: modelData.id
-                                id: modelData.id === "u" ? uField : (modelData.id === "n" ? nField : pField)
-                                anchors.fill: parent; anchors.margins: 10
-                                color: nord4; font.family: "Monaspace Krypton"; font.pixelSize: 13
-                                echoMode: modelData.id === "p" ? TextInput.Password : TextInput.Normal
-                                verticalAlignment: TextInput.AlignVCenter
-                            }
-                        }
+                Text { text: "пароль"; color: "#4C566A"; font.family: "Monaspace Krypton"; font.pixelSize: 11 }
+                Rectangle {
+                    Layout.fillWidth: true; height: 36
+                    color: "#2E3440"; border.color: "#434C5E"; border.width: 1
+                    TextInput {
+                        id: pField
+                        anchors.fill: parent; anchors.margins: 10
+                        color: "#D8DEE9"; font.family: "Monaspace Krypton"; font.pixelSize: 13
+                        echoMode: TextInput.Password
+                        verticalAlignment: TextInput.AlignVCenter
                     }
                 }
 
@@ -419,7 +469,7 @@ Rectangle {
                         model: [
                             { val: "employee", label: "employee", color: "#81A1C1" },
                             { val: "manager",  label: "manager", color: "#EBCB8B" },
-                            { val: "admin",    label: "admin",     color: "#B48EAD" },
+                            { val: "admin",    label: "admin", color: "#B48EAD" },
                         ]
 
                         Rectangle {
@@ -479,6 +529,7 @@ Rectangle {
             }
         }
     }
+
 
     // ── Add Workspace Dialog ─────────────────────────────────
     Popup {

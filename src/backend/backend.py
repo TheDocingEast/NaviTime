@@ -10,6 +10,8 @@ class Backend(QObject):
     selectedTaskChanged = Signal()
     commentsChanged   = Signal()
     hotTaskChanged    = Signal()
+    userInfoChanged = Signal()
+
 
     def __init__(self):
         super().__init__()
@@ -43,7 +45,6 @@ class Backend(QObject):
             if not bcrypt.checkpw(password.encode(), user["password"].encode()):
                 return "error"
         except Exception:
-            # Fallback plain-text for dev/testing
             if user["password"] != password:
                 return "error"
 
@@ -58,24 +59,31 @@ class Backend(QObject):
         else:
             self._current_workspace_name = "All"
 
+        self.userInfoChanged.emit()  # ← после всех присвоений
+
         if user["role"] == "admin":
             return "admin"
         return "board"
 
     # ── Current user props ───────────────────────────────────
-    @Property(str, constant=False)
+    # ТОЛЬКО эти, дубликаты ниже УДАЛИ
+    @Property(str, notify=userInfoChanged)
     def currentUser(self):
         return self._current_user or ""
 
-    @Property(str, constant=False)
+    @Property(int, notify=userInfoChanged)
+    def currentUserId(self):
+        return self._current_user_id or 0
+
+    @Property(str, notify=userInfoChanged)
     def currentRole(self):
         return self._current_role or ""
 
-    @Property(int, constant=False)
+    @Property(int, notify=userInfoChanged)
     def currentWorkspaceId(self):
         return self._current_workspace_id or 0
 
-    @Property(str, constant=False)
+    @Property(str, notify=userInfoChanged)
     def currentWorkspaceName(self):
         return self._current_workspace_name or ""
 
@@ -101,9 +109,11 @@ class Backend(QObject):
 
     @Slot(str, str, int, int, int, str)
     def create_task(self, title, description, workspace_id, status_id, priority, deadline):
-        self.db.create_task(title, description, workspace_id, status_id,
-                            self._current_user_id, priority,
-                            deadline if deadline else None)
+        self.db.create_task(
+            title, description, workspace_id, status_id,
+            self._current_user_id, priority,
+            deadline if deadline and deadline.replace("-", "").strip() else None
+        )
         self.load_tasks(workspace_id)
 
     @Slot(int, int)
@@ -204,3 +214,14 @@ class Backend(QObject):
 
     def close(self):
         self.db.close()
+
+    # ── Statuses  ───────────────────────────────────
+    @Slot(int, str, str)
+    def create_status(self, workspace_id, name, color):
+        self.db.create_status(workspace_id, name, color)
+        self.load_statuses(workspace_id)
+
+    @Slot(int, int)
+    def delete_status(self, status_id, workspace_id):
+        self.db.delete_status(status_id)
+        self.load_statuses(workspace_id)

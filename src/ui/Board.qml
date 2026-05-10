@@ -22,6 +22,7 @@ Rectangle {
     property string currentRole: backend.currentRole ?? "employee"
     property int currentWorkspace: backend.currentWorkspaceId ?? 1
     property string currentWorkspaceName: backend.currentWorkspaceName ?? "Workspace"
+    property int selectedPriority: 2
 
     Component.onCompleted: backend.load_tasks(currentWorkspace)
 
@@ -94,7 +95,6 @@ Rectangle {
 
             // New task button (manager only)
             Rectangle {
-                visible: currentRole === "manager"
                 width: 110
                 height: 28
                 color: newTaskArea.containsMouse ? nord10 : nord9
@@ -102,7 +102,7 @@ Rectangle {
 
                 Text {
                     anchors.centerIn: parent
-                    text: "+ ЗАДАЧА"
+                    text: "+ TASK"
                     color: nord0
                     font.family: "Monaspace Krypton"
                     font.pixelSize: 11
@@ -113,8 +113,27 @@ Rectangle {
                     id: newTaskArea
                     anchors.fill: parent
                     hoverEnabled: true
-                    onClicked: newTaskDialog.open()
+                    onClicked: {
+                        backend.load_statuses(backend.currentWorkspaceId)
+                        if (backend.statuses.length === 0) {
+                            noStatusError.visible = true
+                            return
+                        }
+                        noStatusError.visible = false
+                        newTaskDialog.open()
+                    }
                 }
+
+            }
+            // Рядом с кнопкой добавь:
+            Text {
+                id: noStatusError
+                visible: false
+                text: "// ошибка: нет статусов в воркспейсе"
+                color: "#BF616A"
+                font.family: "Monaspace Krypton"
+                font.pixelSize: 11
+                anchors.verticalCenter: parent.verticalCenter
             }
 
             // Logout
@@ -259,7 +278,7 @@ Rectangle {
             anchors.verticalCenter: parent.verticalCenter
             spacing: 24
 
-            Text { text: "задач: " + backend.tasks.length; color: nord3; font.family: "Monaspace Krypton"; font.pixelSize: 11 }
+            Text { text: "tasks: " + backend.tasks.length; color: nord3; font.family: "Monaspace Krypton"; font.pixelSize: 11 }
             Text { text: "//"; color: nord2; font.family: "Monaspace Krypton"; font.pixelSize: 11 }
             Text { text: "NaviTime Kanban"; color: nord3; font.family: "Monaspace Krypton"; font.pixelSize: 11 }
         }
@@ -293,7 +312,7 @@ Rectangle {
                 spacing: 14
 
                 Text {
-                    text: "// ЗАДАЧА"
+                    text: "// TASK"
                     color: nord8
                     font.family: "Monaspace Krypton"
                     font.pixelSize: 11
@@ -313,7 +332,7 @@ Rectangle {
                 Rectangle { Layout.fillWidth: true; height: 1; color: nord2 }
 
                 Text {
-                    text: backend.selectedTask ? (backend.selectedTask.description ?? "нет описания") : ""
+                    text: backend.selectedTask ? (backend.selectedTask.description ?? "no description") : ""
                     color: nord3
                     font.family: "Monaspace Krypton"
                     font.pixelSize: 13
@@ -326,27 +345,27 @@ Rectangle {
                     columnSpacing: 16
                     rowSpacing: 8
 
-                    Text { text: "дедлайн:"; color: nord3; font.family: "Monaspace Krypton"; font.pixelSize: 12 }
+                    Text { text: "deadline:"; color: nord3; font.family: "Monaspace Krypton"; font.pixelSize: 12 }
                     Text {
                         text: backend.selectedTask ? (backend.selectedTask.deadline ?? "—") : "—"
                         color: nord9; font.family: "Monaspace Krypton"; font.pixelSize: 12
                     }
 
-                    Text { text: "исполнитель:"; color: nord3; font.family: "Monaspace Krypton"; font.pixelSize: 12 }
+                    Text { text: "assignee:"; color: nord3; font.family: "Monaspace Krypton"; font.pixelSize: 12 }
                     Text {
                         text: backend.selectedTask ? (backend.selectedTask.assignee_name ?? "—") : "—"
                         color: nord9; font.family: "Monaspace Krypton"; font.pixelSize: 12
                     }
 
-                    Text { text: "приоритет:"; color: nord3; font.family: "Monaspace Krypton"; font.pixelSize: 12 }
+                    Text { text: "priority:"; color: nord3; font.family: "Monaspace Krypton"; font.pixelSize: 12 }
                     Text {
                         text: {
                             if (!backend.selectedTask) return "—"
                             var p = backend.selectedTask.priority
-                            if (p === 4) return "!! КРИТИЧЕСКИЙ"
-                            if (p === 3) return "! высокий"
-                            if (p === 2) return "средний"
-                            return "низкий"
+                            if (p === 4) return "!! CRITICAL"
+                            if (p === 3) return "! high"
+                            if (p === 2) return "medium"
+                            return "low"
                         }
                         color: {
                             if (!backend.selectedTask) return nord3
@@ -362,7 +381,7 @@ Rectangle {
                 Rectangle { Layout.fillWidth: true; height: 1; color: nord2 }
 
                 // Comments
-                Text { text: "// комментарии"; color: nord8; font.family: "Monaspace Krypton"; font.pixelSize: 11; font.letterSpacing: 2 }
+                Text { text: "// comment"; color: nord8; font.family: "Monaspace Krypton"; font.pixelSize: 11; font.letterSpacing: 2 }
 
                 ScrollView {
                     Layout.fillWidth: true
@@ -409,7 +428,7 @@ Rectangle {
                             verticalAlignment: TextInput.AlignVCenter
 
                             Text {
-                                text: "добавить комментарий..."
+                                text: "add comment..."
                                 color: nord3
                                 font: commentInput.font
                                 visible: !commentInput.text
@@ -449,7 +468,7 @@ Rectangle {
                         border.color: nord11; border.width: 1
                         Behavior on color { ColorAnimation { duration: 100 } }
 
-                        Text { anchors.centerIn: parent; text: "УДАЛИТЬ"; color: nord11; font.family: "Monaspace Krypton"; font.pixelSize: 11; font.letterSpacing: 1 }
+                        Text { anchors.centerIn: parent; text: "DELETE"; color: nord11; font.family: "Monaspace Krypton"; font.pixelSize: 11; font.letterSpacing: 1 }
                         MouseArea {
                             id: deleteArea
                             anchors.fill: parent
@@ -470,7 +489,7 @@ Rectangle {
                     border.color: nord3; border.width: 1
                     Behavior on color { ColorAnimation { duration: 100 } }
 
-                    Text { anchors.centerIn: parent; text: "ЗАКРЫТЬ"; color: nord4; font.family: "Monaspace Krypton"; font.pixelSize: 11; font.letterSpacing: 2 }
+                    Text { anchors.centerIn: parent; text: "CLOSE"; color: nord4; font.family: "Monaspace Krypton"; font.pixelSize: 11; font.letterSpacing: 2 }
                     MouseArea { id: closeArea; anchors.fill: parent; hoverEnabled: true; onClicked: taskDetailDialog.close() }
                 }
             }
@@ -501,10 +520,10 @@ Rectangle {
                 anchors.margins: 28
                 spacing: 12
 
-                Text { text: "// НОВАЯ ЗАДАЧА"; color: nord8; font.family: "Monaspace Krypton"; font.pixelSize: 11; font.letterSpacing: 3 }
+                Text { text: "// NEW TASK"; color: nord8; font.family: "Monaspace Krypton"; font.pixelSize: 11; font.letterSpacing: 3 }
 
                 // Title
-                Text { text: "заголовок"; color: nord3; font.family: "Monaspace Krypton"; font.pixelSize: 11 }
+                Text { text: "title"; color: nord3; font.family: "Monaspace Krypton"; font.pixelSize: 11 }
                 Rectangle {
                     Layout.fillWidth: true; height: 38
                     color: nord0; border.color: newTitle.activeFocus ? nord8 : nord2; border.width: 1
@@ -517,7 +536,7 @@ Rectangle {
                 }
 
                 // Description
-                Text { text: "описание"; color: nord3; font.family: "Monaspace Krypton"; font.pixelSize: 11 }
+                Text { text: "description"; color: nord3; font.family: "Monaspace Krypton"; font.pixelSize: 11 }
                 Rectangle {
                     Layout.fillWidth: true; height: 70
                     color: nord0; border.color: nord2; border.width: 1
@@ -530,17 +549,18 @@ Rectangle {
                 }
 
                 // Priority
-                Text { text: "приоритет"; color: nord3; font.family: "Monaspace Krypton"; font.pixelSize: 11 }
+                Text { text: "priority"; color: nord3; font.family: "Monaspace Krypton"; font.pixelSize: 11 }
                 Row {
                     spacing: 8
                     property int selected: 2
 
                     Repeater {
+                        id: priorityRepeater
                         model: [
-                            { val: 1, label: "низкий",     color: "#4C566A" },
-                            { val: 2, label: "средний",    color: "#EBCB8B" },
-                            { val: 3, label: "высокий",    color: "#D08770" },
-                            { val: 4, label: "крит",       color: "#BF616A" },
+                            { val: 1, label: "low",     color: "#4C566A" },
+                            { val: 2, label: "medium",    color: "#EBCB8B" },
+                            { val: 3, label: "high",    color: "#D08770" },
+                            { val: 4, label: "critical",       color: "#BF616A" },
                         ]
 
                         Rectangle {
@@ -557,14 +577,14 @@ Rectangle {
                             }
                             MouseArea {
                                 anchors.fill: parent
-                                onClicked: parent.parent.selected = modelData.val
+                                onClicked: { parent.parent.selected = modelData.val; selectedPriority = modelData.val }
                             }
                         }
                     }
                 }
 
                 // Deadline
-                Text { text: "дедлайн (YYYY-MM-DD)"; color: nord3; font.family: "Monaspace Krypton"; font.pixelSize: 11 }
+                Text { text: "deadline (YYYY-MM-DD)"; color: nord3; font.family: "Monaspace Krypton"; font.pixelSize: 11 }
                 Rectangle {
                     Layout.fillWidth: true; height: 38
                     color: nord0; border.color: newDeadline.activeFocus ? nord8 : nord2; border.width: 1
@@ -588,7 +608,7 @@ Rectangle {
                         color: cancelNewArea.containsMouse ? nord2 : "transparent"
                         border.color: nord3; border.width: 1
                         Behavior on color { ColorAnimation { duration: 100 } }
-                        Text { anchors.centerIn: parent; text: "ОТМЕНА"; color: nord4; font.family: "Monaspace Krypton"; font.pixelSize: 11; font.letterSpacing: 1 }
+                        Text { anchors.centerIn: parent; text: "CANCEL"; color: nord4; font.family: "Monaspace Krypton"; font.pixelSize: 11; font.letterSpacing: 1 }
                         MouseArea { id: cancelNewArea; anchors.fill: parent; hoverEnabled: true; onClicked: newTaskDialog.close() }
                     }
 
@@ -596,7 +616,15 @@ Rectangle {
                         width: (parent.width - 8) / 2; height: 36
                         color: createArea.containsMouse ? nord10 : nord9
                         Behavior on color { ColorAnimation { duration: 100 } }
-                        Text { anchors.centerIn: parent; text: "СОЗДАТЬ →"; color: nord0; font.family: "Monaspace Krypton"; font.pixelSize: 11; font.weight: Font.Bold; font.letterSpacing: 1 }
+                        Text {
+                            anchors.centerIn: parent
+                            text: "CREATE →"
+                            color: nord0
+                            font.family: "Monaspace Krypton"
+                            font.pixelSize: 11
+                            font.weight: Font.Bold
+                            font.letterSpacing: 1
+                        }
                         MouseArea {
                             id: createArea; anchors.fill: parent; hoverEnabled: true
                             onClicked: {
@@ -604,10 +632,10 @@ Rectangle {
                                     backend.create_task(
                                         newTitle.text,
                                         newDesc.text,
-                                        currentWorkspace,
-                                        backend.statuses[0].status_id,
-                                        2, // priority TODO: wire up
-                                        newDeadline.text !== "" ? newDeadline.text : null
+                                        backend.currentWorkspaceId,
+                                        newTaskDialog.selectedStatus,  // ← вместо statuses[0]
+                                        selectedPriority,
+                                        newDeadline.text.replace(/-/g, "").trim() !== "" ? newDeadline.text : ""
                                     )
                                     newTitle.text = ""
                                     newDesc.text = ""

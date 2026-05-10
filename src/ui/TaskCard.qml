@@ -76,10 +76,10 @@ Rectangle {
 
             Text {
                 text: {
-                    if (priority === 4) return "!! КРИТИЧЕСКИЙ"
-                    if (priority === 3) return "! высокий"
-                    if (priority === 2) return "средний"
-                    return "низкий"
+                    if (priority === 4) return "!! CRITICAL"
+                    if (priority === 3) return "! high"
+                    if (priority === 2) return "medium"
+                    return "low"
                 }
                 color: {
                     if (priority === 4) return "#BF616A"
