@@ -3,15 +3,14 @@ from sql.db_client import DBClient
 
 
 class Backend(QObject):
-    tasksChanged      = Signal()
-    usersChanged      = Signal()
-    workspacesChanged = Signal()
-    statusesChanged   = Signal()
+    tasksChanged        = Signal()
+    usersChanged        = Signal()
+    workspacesChanged   = Signal()
+    statusesChanged     = Signal()
     selectedTaskChanged = Signal()
-    commentsChanged   = Signal()
-    hotTaskChanged    = Signal()
-    userInfoChanged = Signal()
-
+    commentsChanged     = Signal()
+    hotTaskChanged      = Signal()
+    userInfoChanged     = Signal()
 
     def __init__(self):
         super().__init__()
@@ -21,17 +20,17 @@ class Backend(QObject):
             password="ghio#21d",
             host="85.209.135.157"
         )
-        self._tasks    = []
-        self._users    = []
-        self._workspaces = []
-        self._statuses = []
-        self._selected_task = None
+        self._tasks                  = []
+        self._users                  = []
+        self._workspaces             = []
+        self._statuses               = []
+        self._selected_task          = None
         self._selected_task_comments = []
-        self._hot_task = None
-        self._current_user = None
-        self._current_user_id = None
-        self._current_role = None
-        self._current_workspace_id = None
+        self._hot_task               = None
+        self._current_user           = None
+        self._current_user_id        = None
+        self._current_role           = None
+        self._current_workspace_id   = None
         self._current_workspace_name = None
 
     # ── Auth ─────────────────────────────────────────────────
@@ -48,10 +47,10 @@ class Backend(QObject):
             if user["password"] != password:
                 return "error"
 
-        self._current_user = user["username"]
-        self._current_user_id = user["user_id"]
-        self._current_role = user["role"]
-        self._current_workspace_id = user.get("workspace_id")
+        self._current_user           = user["username"]
+        self._current_user_id        = user["user_id"]
+        self._current_role           = user["role"]
+        self._current_workspace_id   = user.get("workspace_id")
 
         if user.get("workspace_id"):
             ws = self.db.get_workspace_by_id(user["workspace_id"])
@@ -59,14 +58,13 @@ class Backend(QObject):
         else:
             self._current_workspace_name = "All"
 
-        self.userInfoChanged.emit()  # ← после всех присвоений
+        self.userInfoChanged.emit()
 
         if user["role"] == "admin":
             return "admin"
         return "board"
 
     # ── Current user props ───────────────────────────────────
-    # ТОЛЬКО эти, дубликаты ниже УДАЛИ
     @Property(str, notify=userInfoChanged)
     def currentUser(self):
         return self._current_user or ""
@@ -91,11 +89,11 @@ class Backend(QObject):
     @Slot(int)
     def load_tasks(self, workspace_id):
         self._tasks = [dict(t) for t in self.db.get_tasks(workspace_id)]
-        # Format deadline
         for t in self._tasks:
             if t.get("deadline"):
                 t["deadline"] = str(t["deadline"])[:10]
-        self._hot_task = dict(self.db.get_hot_task(workspace_id)) if self.db.get_hot_task(workspace_id) else None
+        hot = self.db.get_hot_task(workspace_id)
+        self._hot_task = dict(hot) if hot else None
         self.tasksChanged.emit()
         self.hotTaskChanged.emit()
 
@@ -166,7 +164,17 @@ class Backend(QObject):
     def statuses(self):
         return self._statuses
 
-    # ── Users (admin) ────────────────────────────────────────
+    @Slot(int, str, str)
+    def create_status(self, workspace_id, name, color):
+        self.db.create_status(workspace_id, name, color)
+        self.load_statuses(workspace_id)
+
+    @Slot(int, int)
+    def delete_status(self, status_id, workspace_id):
+        self.db.delete_status(status_id)
+        self.load_statuses(workspace_id)
+
+    # ── Users ────────────────────────────────────────────────
     @Slot()
     def load_users(self):
         self._users = [dict(u) for u in self.db.get_all_users()]
@@ -189,7 +197,7 @@ class Backend(QObject):
         self.db.set_user_active(user_id, is_active)
         self.load_users()
 
-    # ── Workspaces (admin) ───────────────────────────────────
+    # ── Workspaces ───────────────────────────────────────────
     @Slot()
     def load_workspaces(self):
         self._workspaces = [dict(w) for w in self.db.get_workspaces()]
@@ -214,14 +222,3 @@ class Backend(QObject):
 
     def close(self):
         self.db.close()
-
-    # ── Statuses  ───────────────────────────────────
-    @Slot(int, str, str)
-    def create_status(self, workspace_id, name, color):
-        self.db.create_status(workspace_id, name, color)
-        self.load_statuses(workspace_id)
-
-    @Slot(int, int)
-    def delete_status(self, status_id, workspace_id):
-        self.db.delete_status(status_id)
-        self.load_statuses(workspace_id)

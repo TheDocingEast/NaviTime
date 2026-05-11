@@ -4,7 +4,6 @@ import QtQuick.Layouts
 
 Rectangle {
     id: root
-    anchors.fill: parent
     color: "#2E3440"
 
     readonly property color nord0:  "#2E3440"
@@ -20,11 +19,12 @@ Rectangle {
     readonly property color nord14: "#A3BE8C"
     readonly property color nord15: "#B48EAD"
 
-    property int activeTab: 0  // 0 = users, 1 = workspaces
+    property int activeTab: 0  // 0=users 1=workspaces 2=statuses
 
     Component.onCompleted: {
         backend.load_users()
         backend.load_workspaces()
+        backend.load_statuses(0)  // все статусы или по workspace
     }
 
     // ── Top bar ──────────────────────────────────────────────
@@ -57,7 +57,7 @@ Rectangle {
             anchors.verticalCenter: parent.verticalCenter
             spacing: 12
 
-            Text { text: backend.currentUser ?? "admin"; color: nord15; font.family: "Monaspace Krypton"; font.pixelSize: 12 }
+            Text { text: backend.currentUser; color: nord15; font.family: "Monaspace Krypton"; font.pixelSize: 12 }
 
             Rectangle {
                 width: 28; height: 28
@@ -65,12 +65,17 @@ Rectangle {
                 border.color: nord3; border.width: 1
                 Behavior on color { ColorAnimation { duration: 100 } }
                 Text { anchors.centerIn: parent; text: "⏻"; color: nord11; font.pixelSize: 14 }
-                MouseArea { id: logoutArea; anchors.fill: parent; hoverEnabled: true; onClicked: root.pop() }
+                MouseArea {
+                    id: logoutArea
+                    anchors.fill: parent
+                    hoverEnabled: true
+                    onClicked: appWindow.pop()
+                }
             }
         }
     }
 
-    // ── Sidebar tabs ─────────────────────────────────────────
+    // ── Sidebar ──────────────────────────────────────────────
     Rectangle {
         id: sidebar
         width: 200
@@ -78,8 +83,6 @@ Rectangle {
         anchors.bottom: statusBar.top
         anchors.left: parent.left
         color: nord1
-        border.color: nord2
-        border.width: 0
 
         Rectangle { width: 1; height: parent.height; color: nord2; anchors.right: parent.right }
 
@@ -102,8 +105,9 @@ Rectangle {
 
             Repeater {
                 model: [
-                    { icon: "◈", label: "USERS", idx: 0 },
-                    { icon: "◫", label: "WORKSPACES",   idx: 1 },
+                    { icon: "◈", label: "USERS",       idx: 0 },
+                    { icon: "◫", label: "WORKSPACES",  idx: 1 },
+                    { icon: "◧", label: "STATUSES",    idx: 2 },
                 ]
 
                 Rectangle {
@@ -155,143 +159,86 @@ Rectangle {
             spacing: 16
             visible: activeTab === 0
 
-            // Header row
             Row {
                 spacing: 12
                 Layout.fillWidth: true
 
-                Text {
-                    text: "// USERS"
-                    color: nord15
-                    font.family: "Monaspace Krypton"
-                    font.pixelSize: 13
-                    font.letterSpacing: 2
-                    anchors.verticalCenter: parent.verticalCenter
-                }
-
+                Text { text: "// USERS"; color: nord15; font.family: "Monaspace Krypton"; font.pixelSize: 13; font.letterSpacing: 2 }
                 Item { width: 1; height: 1; Layout.fillWidth: true }
 
                 Rectangle {
-                    width: 150; height: 32
+                    width: 120; height: 32
                     color: addUserArea.containsMouse ? nord15 : nord9
                     Behavior on color { ColorAnimation { duration: 100 } }
-
-                    Text {
-                        anchors.centerIn: parent
-                        text: "+ USER"
-                        color: nord0
-                        font.family: "Monaspace Krypton"; font.pixelSize: 10; font.weight: Font.Bold; font.letterSpacing: 1
-                    }
+                    Text { anchors.centerIn: parent; text: "+ USER"; color: nord0; font.family: "Monaspace Krypton"; font.pixelSize: 10; font.weight: Font.Bold; font.letterSpacing: 1 }
                     MouseArea { id: addUserArea; anchors.fill: parent; hoverEnabled: true; onClicked: addUserDialog.open() }
                 }
             }
 
-            // Table header
             Rectangle {
-                Layout.fillWidth: true
-                height: 32
-                color: nord2
+                Layout.fillWidth: true; height: 32; color: nord2
 
                 Row {
-                    anchors.fill: parent
-                    anchors.leftMargin: 12
+                    anchors.fill: parent; anchors.leftMargin: 12
 
                     Repeater {
                         model: [
-                            { label: "ID",          w: 50  },
-                            { label: "USERNAME",    w: 160 },
-                            { label: "NAME",         w: 200 },
-                            { label: "ROLE",        w: 120 },
-                            { label: "WORKSPACE",   w: 130 },
-                            { label: "STATUS",      w: 100 },
-                            { label: "ACTIONS",    w: 150 },
+                            { label: "ID",        w: 50  },
+                            { label: "USERNAME",  w: 150 },
+                            { label: "NAME",      w: 180 },
+                            { label: "ROLE",      w: 110 },
+                            { label: "WORKSPACE", w: 120 },
+                            { label: "STATUS",    w: 90  },
+                            { label: "ACTIONS",   w: 120 },
                         ]
-
-                        Text {
-                            width: modelData.w
-                            height: parent.height
-                            text: modelData.label
-                            color: nord3
-                            font.family: "Monaspace Krypton"; font.pixelSize: 10; font.letterSpacing: 1
-                            verticalAlignment: Text.AlignVCenter
-                        }
+                        Text { width: modelData.w; height: parent.height; text: modelData.label; color: nord3; font.family: "Monaspace Krypton"; font.pixelSize: 10; font.letterSpacing: 1; verticalAlignment: Text.AlignVCenter }
                     }
                 }
             }
 
-            // Users list
             ScrollView {
-                Layout.fillWidth: true
-                Layout.fillHeight: true
-                clip: true
+                Layout.fillWidth: true; Layout.fillHeight: true; clip: true
                 ScrollBar.horizontal.policy: ScrollBar.AlwaysOff
 
                 Column {
-                    width: parent.width
-                    spacing: 2
+                    width: parent.width; spacing: 2
 
                     Repeater {
                         model: backend.users
 
                         Rectangle {
-                            width: parent.width
-                            height: 38
+                            width: parent.width; height: 38
                             color: rowArea.containsMouse ? nord2 : (index % 2 === 0 ? nord1 : "#363D4E")
                             Behavior on color { ColorAnimation { duration: 80 } }
 
                             Row {
-                                anchors.fill: parent
-                                anchors.leftMargin: 12
+                                anchors.fill: parent; anchors.leftMargin: 12
 
-                                Text { width: 50;  height: parent.height; text: modelData.user_id;      color: nord3;  font.family: "Monaspace Krypton"; font.pixelSize: 12; verticalAlignment: Text.AlignVCenter }
-                                Text { width: 160; height: parent.height; text: modelData.username;     color: nord4;  font.family: "Monaspace Krypton"; font.pixelSize: 12; verticalAlignment: Text.AlignVCenter }
-                                Text { width: 200; height: parent.height; text: modelData.full_name;    color: nord4;  font.family: "Monaspace Krypton"; font.pixelSize: 12; verticalAlignment: Text.AlignVCenter; elide: Text.ElideRight }
+                                Text { width: 50;  height: parent.height; text: modelData.user_id;   color: nord3; font.family: "Monaspace Krypton"; font.pixelSize: 12; verticalAlignment: Text.AlignVCenter }
+                                Text { width: 150; height: parent.height; text: modelData.username;  color: nord4; font.family: "Monaspace Krypton"; font.pixelSize: 12; verticalAlignment: Text.AlignVCenter }
+                                Text { width: 180; height: parent.height; text: modelData.full_name; color: nord4; font.family: "Monaspace Krypton"; font.pixelSize: 12; verticalAlignment: Text.AlignVCenter; elide: Text.ElideRight }
                                 Text {
-                                    width: 120; height: parent.height
+                                    width: 110; height: parent.height
                                     text: modelData.role
-                                    color: {
-                                        if (modelData.role === "admin")    return nord15
-                                        if (modelData.role === "manager")  return nord13
-                                        return nord9
-                                    }
+                                    color: modelData.role === "admin" ? nord15 : (modelData.role === "manager" ? nord13 : nord9)
                                     font.family: "Monaspace Krypton"; font.pixelSize: 12; verticalAlignment: Text.AlignVCenter
                                 }
-                                Text { width: 130; height: parent.height; text: modelData.workspace_name ?? "—"; color: nord3; font.family: "Monaspace Krypton"; font.pixelSize: 12; verticalAlignment: Text.AlignVCenter }
+                                Text { width: 120; height: parent.height; text: modelData.workspace_name ?? "—"; color: nord3; font.family: "Monaspace Krypton"; font.pixelSize: 12; verticalAlignment: Text.AlignVCenter }
 
                                 Rectangle {
-                                    width: 80; height: 20
-                                    anchors.verticalCenter: parent.verticalCenter
-                                    anchors.leftMargin: 10
+                                    width: 70; height: 20; anchors.verticalCenter: parent.verticalCenter
                                     color: modelData.is_active ? "#1A2E1A" : "#2E1A1A"
                                     border.color: modelData.is_active ? nord14 : nord11; border.width: 1
-
-                                    Text {
-                                        anchors.centerIn: parent
-                                        text: modelData.is_active ? "ACTIVE" : "INACTIVE"
-                                        color: modelData.is_active ? nord14 : nord11
-                                        font.family: "Monaspace Krypton"; font.pixelSize: 9; font.letterSpacing: 1
-                                    }
+                                    Text { anchors.centerIn: parent; text: modelData.is_active ? "ACTIVE" : "INACTIVE"; color: modelData.is_active ? nord14 : nord11; font.family: "Monaspace Krypton"; font.pixelSize: 9; font.letterSpacing: 1 }
                                 }
 
-                                // Toggle active button
                                 Rectangle {
-                                    width: 80; height: 24
-                                    anchors.verticalCenter: parent.verticalCenter
-                                    anchors.leftMargin: 10
+                                    width: 80; height: 24; anchors.verticalCenter: parent.verticalCenter; anchors.leftMargin: 8
                                     color: toggleArea.containsMouse ? (modelData.is_active ? "#3B2A2A" : "#1A2E1A") : "transparent"
                                     border.color: modelData.is_active ? nord11 : nord14; border.width: 1
                                     Behavior on color { ColorAnimation { duration: 80 } }
-
-                                    Text {
-                                        anchors.centerIn: parent
-                                        text: modelData.is_active ? "INACTIVE" : "ACTIVE"
-                                        color: modelData.is_active ? nord11 : nord14
-                                        font.family: "Monaspace Krypton"; font.pixelSize: 9; font.letterSpacing: 1
-                                    }
-                                    MouseArea {
-                                        id: toggleArea; anchors.fill: parent; hoverEnabled: true
-                                        onClicked: backend.toggle_user_active(modelData.user_id, !modelData.is_active)
-                                    }
+                                    Text { anchors.centerIn: parent; text: modelData.is_active ? "DEACT." : "ACTIV."; color: modelData.is_active ? nord11 : nord14; font.family: "Monaspace Krypton"; font.pixelSize: 9; font.letterSpacing: 1 }
+                                    MouseArea { id: toggleArea; anchors.fill: parent; hoverEnabled: true; onClicked: backend.toggle_user_active(modelData.user_id, !modelData.is_active) }
                                 }
                             }
 
@@ -309,22 +256,11 @@ Rectangle {
             visible: activeTab === 1
 
             Row {
-                spacing: 12
-                Layout.fillWidth: true
-
-                Text {
-                    text: "// WORKSPACES";
-                    color: nord15;
-                    font.family: "Monaspace Krypton";
-                    font.pixelSize: 13;
-                    font.letterSpacing: 2
-                    anchors.verticalCenter: parent.verticalCenter
-                }
-
+                spacing: 12; Layout.fillWidth: true
+                Text { text: "// WORKSPACES"; color: nord15; font.family: "Monaspace Krypton"; font.pixelSize: 13; font.letterSpacing: 2 }
                 Item { width: 1; height: 1; Layout.fillWidth: true }
-
                 Rectangle {
-                    width: 150; height: 32
+                    width: 140; height: 32
                     color: addWSArea.containsMouse ? nord15 : nord9
                     Behavior on color { ColorAnimation { duration: 100 } }
                     Text { anchors.centerIn: parent; text: "+ WORKSPACE"; color: nord0; font.family: "Monaspace Krypton"; font.pixelSize: 10; font.weight: Font.Bold; font.letterSpacing: 1 }
@@ -332,12 +268,8 @@ Rectangle {
                 }
             }
 
-            Rectangle {
-                Layout.fillWidth: true; height: 32; color: nord2
-
-                Row {
-                    anchors.fill: parent; anchors.leftMargin: 12
-
+            Rectangle { Layout.fillWidth: true; height: 32; color: nord2
+                Row { anchors.fill: parent; anchors.leftMargin: 12
                     Repeater {
                         model: [{ label: "ID", w: 60 }, { label: "NAME", w: 300 }, { label: "CREATED", w: 200 }, { label: "ACTIONS", w: 120 }]
                         Text { width: modelData.w; height: parent.height; text: modelData.label; color: nord3; font.family: "Monaspace Krypton"; font.pixelSize: 10; font.letterSpacing: 1; verticalAlignment: Text.AlignVCenter }
@@ -348,36 +280,122 @@ Rectangle {
             ScrollView {
                 Layout.fillWidth: true; Layout.fillHeight: true; clip: true
                 ScrollBar.horizontal.policy: ScrollBar.AlwaysOff
-
                 Column {
                     width: parent.width; spacing: 2
-
                     Repeater {
                         model: backend.workspaces
-
                         Rectangle {
                             width: parent.width; height: 38
                             color: wsRowArea.containsMouse ? nord2 : (index % 2 === 0 ? nord1 : "#363D4E")
                             Behavior on color { ColorAnimation { duration: 80 } }
-
                             Row {
                                 anchors.fill: parent; anchors.leftMargin: 12
-
                                 Text { width: 60;  height: parent.height; text: modelData.workspace_id; color: nord3; font.family: "Monaspace Krypton"; font.pixelSize: 12; verticalAlignment: Text.AlignVCenter }
-                                Text { width: 300; height: parent.height; text: modelData.name;          color: nord4; font.family: "Monaspace Krypton"; font.pixelSize: 12; verticalAlignment: Text.AlignVCenter }
-                                Text { width: 200; height: parent.height; text: modelData.created_at;   color: nord3; font.family: "Monaspace Krypton"; font.pixelSize: 11; verticalAlignment: Text.AlignVCenter }
-
+                                Text { width: 300; height: parent.height; text: modelData.name;         color: nord4; font.family: "Monaspace Krypton"; font.pixelSize: 12; verticalAlignment: Text.AlignVCenter }
+                                Text { width: 200; height: parent.height; text: modelData.created_at;  color: nord3; font.family: "Monaspace Krypton"; font.pixelSize: 11; verticalAlignment: Text.AlignVCenter }
                                 Rectangle {
                                     width: 80; height: 24; anchors.verticalCenter: parent.verticalCenter
-                                    color: delWSArea.containsMouse ? "#3B2A2A" : "transparent"
-                                    border.color: nord11; border.width: 1
+                                    color: delWSArea.containsMouse ? "#3B2A2A" : "transparent"; border.color: nord11; border.width: 1
                                     Behavior on color { ColorAnimation { duration: 80 } }
                                     Text { anchors.centerIn: parent; text: "DELETE"; color: nord11; font.family: "Monaspace Krypton"; font.pixelSize: 9; font.letterSpacing: 1 }
                                     MouseArea { id: delWSArea; anchors.fill: parent; hoverEnabled: true; onClicked: backend.delete_workspace(modelData.workspace_id) }
                                 }
                             }
-
                             MouseArea { id: wsRowArea; anchors.fill: parent; hoverEnabled: true; propagateComposedEvents: true }
+                        }
+                    }
+                }
+            }
+        }
+
+        // ── STATUSES TAB ─────────────────────────────────────
+        ColumnLayout {
+            anchors.fill: parent
+            spacing: 16
+            visible: activeTab === 2
+
+            Row {
+                spacing: 12; Layout.fillWidth: true
+                Text { text: "// STATUSES"; color: nord15; font.family: "Monaspace Krypton"; font.pixelSize: 13; font.letterSpacing: 2 }
+                Item { width: 1; height: 1; Layout.fillWidth: true }
+
+                // Workspace picker для статусов
+                Row {
+                    spacing: 8
+                    anchors.verticalCenter: parent.verticalCenter
+
+                    Text { text: "workspace:"; color: nord3; font.family: "Monaspace Krypton"; font.pixelSize: 11; anchors.verticalCenter: parent.verticalCenter }
+                    ComboBox {
+                        id: statusWsCombo
+                        width: 160
+                        model: backend.workspaces.map(w => w.name)
+                        font.family: "Monaspace Krypton"
+                        background: Rectangle { color: nord0; border.color: nord2; border.width: 1 }
+                        contentItem: Text { leftPadding: 10; text: statusWsCombo.displayText; color: nord4; font.family: "Monaspace Krypton"; font.pixelSize: 12; verticalAlignment: Text.AlignVCenter }
+                        onCurrentIndexChanged: {
+                            if (backend.workspaces.length > currentIndex)
+                                backend.load_statuses(backend.workspaces[currentIndex].workspace_id)
+                        }
+                    }
+                }
+
+                Rectangle {
+                    width: 120; height: 32
+                    color: addStatusArea.containsMouse ? nord15 : nord9
+                    Behavior on color { ColorAnimation { duration: 100 } }
+                    Text { anchors.centerIn: parent; text: "+ STATUS"; color: nord0; font.family: "Monaspace Krypton"; font.pixelSize: 10; font.weight: Font.Bold; font.letterSpacing: 1 }
+                    MouseArea { id: addStatusArea; anchors.fill: parent; hoverEnabled: true; onClicked: addStatusDialog.open() }
+                }
+            }
+
+            Rectangle { Layout.fillWidth: true; height: 32; color: nord2
+                Row { anchors.fill: parent; anchors.leftMargin: 12
+                    Repeater {
+                        model: [{ label: "ID", w: 60 }, { label: "NAME", w: 200 }, { label: "COLOR", w: 120 }, { label: "POSITION", w: 100 }, { label: "ACTIONS", w: 120 }]
+                        Text { width: modelData.w; height: parent.height; text: modelData.label; color: nord3; font.family: "Monaspace Krypton"; font.pixelSize: 10; font.letterSpacing: 1; verticalAlignment: Text.AlignVCenter }
+                    }
+                }
+            }
+
+            ScrollView {
+                Layout.fillWidth: true; Layout.fillHeight: true; clip: true
+                ScrollBar.horizontal.policy: ScrollBar.AlwaysOff
+                Column {
+                    width: parent.width; spacing: 2
+                    Repeater {
+                        model: backend.statuses
+                        Rectangle {
+                            width: parent.width; height: 38
+                            color: stRowArea.containsMouse ? nord2 : (index % 2 === 0 ? nord1 : "#363D4E")
+                            Behavior on color { ColorAnimation { duration: 80 } }
+                            Row {
+                                anchors.fill: parent; anchors.leftMargin: 12; spacing: 0
+                                Text { width: 60;  height: parent.height; text: modelData.status_id; color: nord3; font.family: "Monaspace Krypton"; font.pixelSize: 12; verticalAlignment: Text.AlignVCenter }
+                                Text { width: 200; height: parent.height; text: modelData.name;      color: nord4; font.family: "Monaspace Krypton"; font.pixelSize: 12; verticalAlignment: Text.AlignVCenter }
+                                Row {
+                                    width: 120; height: parent.height
+                                    spacing: 8
+                                    anchors.verticalCenter: parent.verticalCenter
+                                    Rectangle { width: 16; height: 16; color: modelData.color ?? "#5E81AC"; anchors.verticalCenter: parent.verticalCenter }
+                                    Text { text: modelData.color ?? "—"; color: nord3; font.family: "Monaspace Krypton"; font.pixelSize: 11; anchors.verticalCenter: parent.verticalCenter }
+                                }
+                                Text { width: 100; height: parent.height; text: modelData.position;  color: nord3; font.family: "Monaspace Krypton"; font.pixelSize: 12; verticalAlignment: Text.AlignVCenter }
+                                Rectangle {
+                                    width: 80; height: 24; anchors.verticalCenter: parent.verticalCenter
+                                    color: delStArea.containsMouse ? "#3B2A2A" : "transparent"; border.color: nord11; border.width: 1
+                                    Behavior on color { ColorAnimation { duration: 80 } }
+                                    Text { anchors.centerIn: parent; text: "DELETE"; color: nord11; font.family: "Monaspace Krypton"; font.pixelSize: 9; font.letterSpacing: 1 }
+                                    MouseArea {
+                                        id: delStArea; anchors.fill: parent; hoverEnabled: true
+                                        onClicked: {
+                                            var wsId = backend.workspaces.length > statusWsCombo.currentIndex
+                                                ? backend.workspaces[statusWsCombo.currentIndex].workspace_id : 0
+                                            backend.delete_status(modelData.status_id, wsId)
+                                        }
+                                    }
+                                }
+                            }
+                            MouseArea { id: stRowArea; anchors.fill: parent; hoverEnabled: true; propagateComposedEvents: true }
                         }
                     }
                 }
@@ -390,13 +408,12 @@ Rectangle {
         id: statusBar
         width: parent.width; height: 28
         color: nord1; anchors.bottom: parent.bottom
-
         Rectangle { width: parent.width; height: 1; color: nord2; anchors.top: parent.top }
-
         Row {
             anchors.left: parent.left; anchors.leftMargin: 16; anchors.verticalCenter: parent.verticalCenter; spacing: 24
             Text { text: "users: " + backend.users.length; color: nord3; font.family: "Monaspace Krypton"; font.pixelSize: 11 }
-            Text { text: "workspaces: "   + backend.workspaces.length; color: nord3; font.family: "Monaspace Krypton"; font.pixelSize: 11 }
+            Text { text: "workspaces: " + backend.workspaces.length; color: nord3; font.family: "Monaspace Krypton"; font.pixelSize: 11 }
+            Text { text: "statuses: " + backend.statuses.length; color: nord3; font.family: "Monaspace Krypton"; font.pixelSize: 11 }
         }
     }
 
@@ -419,59 +436,39 @@ Rectangle {
 
                 Text { text: "// NEW USER"; color: nord15; font.family: "Monaspace Krypton"; font.pixelSize: 11; font.letterSpacing: 3 }
 
-                // Вместо Repeater с динамическими id — просто три поля явно:
-
-                Text { text: "username"; color: "#4C566A"; font.family: "Monaspace Krypton"; font.pixelSize: 11 }
+                Text { text: "username"; color: nord3; font.family: "Monaspace Krypton"; font.pixelSize: 11 }
                 Rectangle {
                     Layout.fillWidth: true; height: 36
-                    color: "#2E3440"; border.color: "#434C5E"; border.width: 1
-                    TextInput {
-                        id: uField
-                        anchors.fill: parent; anchors.margins: 10
-                        color: "#D8DEE9"; font.family: "Monaspace Krypton"; font.pixelSize: 13
-                        verticalAlignment: TextInput.AlignVCenter
-                    }
+                    color: nord0; border.color: uField.activeFocus ? nord8 : nord2; border.width: 1
+                    TextInput { id: uField; anchors.fill: parent; anchors.margins: 10; color: nord4; font.family: "Monaspace Krypton"; font.pixelSize: 13; verticalAlignment: TextInput.AlignVCenter }
                 }
 
-                Text { text: "full name"; color: "#4C566A"; font.family: "Monaspace Krypton"; font.pixelSize: 11 }
+                Text { text: "full name"; color: nord3; font.family: "Monaspace Krypton"; font.pixelSize: 11 }
                 Rectangle {
                     Layout.fillWidth: true; height: 36
-                    color: "#2E3440"; border.color: "#434C5E"; border.width: 1
-                    TextInput {
-                        id: nField
-                        anchors.fill: parent; anchors.margins: 10
-                        color: "#D8DEE9"; font.family: "Monaspace Krypton"; font.pixelSize: 13
-                        verticalAlignment: TextInput.AlignVCenter
-                    }
+                    color: nord0; border.color: nField.activeFocus ? nord8 : nord2; border.width: 1
+                    TextInput { id: nField; anchors.fill: parent; anchors.margins: 10; color: nord4; font.family: "Monaspace Krypton"; font.pixelSize: 13; verticalAlignment: TextInput.AlignVCenter }
                 }
 
-                Text { text: "пароль"; color: "#4C566A"; font.family: "Monaspace Krypton"; font.pixelSize: 11 }
+                Text { text: "password"; color: nord3; font.family: "Monaspace Krypton"; font.pixelSize: 11 }
                 Rectangle {
                     Layout.fillWidth: true; height: 36
-                    color: "#2E3440"; border.color: "#434C5E"; border.width: 1
-                    TextInput {
-                        id: pField
-                        anchors.fill: parent; anchors.margins: 10
-                        color: "#D8DEE9"; font.family: "Monaspace Krypton"; font.pixelSize: 13
-                        echoMode: TextInput.Password
-                        verticalAlignment: TextInput.AlignVCenter
-                    }
+                    color: nord0; border.color: pField.activeFocus ? nord8 : nord2; border.width: 1
+                    TextInput { id: pField; anchors.fill: parent; anchors.margins: 10; color: nord4; font.family: "Monaspace Krypton"; font.pixelSize: 13; echoMode: TextInput.Password; verticalAlignment: TextInput.AlignVCenter }
                 }
 
-                // Role selector
                 Text { text: "role"; color: nord3; font.family: "Monaspace Krypton"; font.pixelSize: 11 }
                 Row {
                     spacing: 8
-                    property string selected: "employee"
                     id: roleSelector
+                    property string selected: "employee"
 
                     Repeater {
                         model: [
                             { val: "employee", label: "employee", color: "#81A1C1" },
-                            { val: "manager",  label: "manager", color: "#EBCB8B" },
-                            { val: "admin",    label: "admin", color: "#B48EAD" },
+                            { val: "manager",  label: "manager",  color: "#EBCB8B" },
+                            { val: "admin",    label: "admin",    color: "#B48EAD" },
                         ]
-
                         Rectangle {
                             width: 100; height: 28
                             color: roleSelector.selected === modelData.val ? modelData.color : nord2
@@ -483,7 +480,6 @@ Rectangle {
                     }
                 }
 
-                // Workspace selector (only for employee)
                 Text { text: "workspace"; color: nord3; font.family: "Monaspace Krypton"; font.pixelSize: 11; visible: roleSelector.selected === "employee" }
                 ComboBox {
                     id: wsCombo
@@ -504,7 +500,7 @@ Rectangle {
                         width: (parent.width - 8) / 2; height: 34
                         color: cancelUA.containsMouse ? nord2 : "transparent"; border.color: nord3; border.width: 1
                         Behavior on color { ColorAnimation { duration: 100 } }
-                        Text { anchors.centerIn: parent; text: "CANCEL"; color: nord4; font.family: "Monaspace Krypton"; font.pixelSize: 11; font.letterSpacing: 1 }
+                        Text { anchors.centerIn: parent; text: "CANCEL"; color: nord4; font.family: "Monaspace Krypton"; font.pixelSize: 11 }
                         MouseArea { id: cancelUA; anchors.fill: parent; hoverEnabled: true; onClicked: addUserDialog.close() }
                     }
 
@@ -512,13 +508,13 @@ Rectangle {
                         width: (parent.width - 8) / 2; height: 34
                         color: createUA.containsMouse ? nord15 : nord9
                         Behavior on color { ColorAnimation { duration: 100 } }
-                        Text { anchors.centerIn: parent; text: "CREATE →"; color: nord0; font.family: "Monaspace Krypton"; font.pixelSize: 11; font.weight: Font.Bold; font.letterSpacing: 1 }
+                        Text { anchors.centerIn: parent; text: "CREATE →"; color: nord0; font.family: "Monaspace Krypton"; font.pixelSize: 11; font.weight: Font.Bold }
                         MouseArea {
                             id: createUA; anchors.fill: parent; hoverEnabled: true
                             onClicked: {
-                                var wsId = roleSelector.selected === "employee"
-                                    ? backend.workspaces[wsCombo.currentIndex].workspace_id
-                                    : null
+                                if (uField.text === "" || nField.text === "" || pField.text === "") return
+                                var wsId = roleSelector.selected === "employee" && backend.workspaces.length > 0
+                                    ? backend.workspaces[wsCombo.currentIndex].workspace_id : null
                                 backend.create_user(uField.text, nField.text, pField.text, roleSelector.selected, wsId)
                                 uField.text = ""; nField.text = ""; pField.text = ""
                                 addUserDialog.close()
@@ -529,7 +525,6 @@ Rectangle {
             }
         }
     }
-
 
     // ── Add Workspace Dialog ─────────────────────────────────
     Popup {
@@ -553,11 +548,7 @@ Rectangle {
                 Rectangle {
                     Layout.fillWidth: true; height: 36
                     color: nord0; border.color: wsNameInput.activeFocus ? nord8 : nord2; border.width: 1
-                    TextInput {
-                        id: wsNameInput
-                        anchors.fill: parent; anchors.margins: 10
-                        color: nord4; font.family: "Monaspace Krypton"; font.pixelSize: 13; verticalAlignment: TextInput.AlignVCenter
-                    }
+                    TextInput { id: wsNameInput; anchors.fill: parent; anchors.margins: 10; color: nord4; font.family: "Monaspace Krypton"; font.pixelSize: 13; verticalAlignment: TextInput.AlignVCenter }
                 }
 
                 Row {
@@ -583,6 +574,82 @@ Rectangle {
                                     backend.create_workspace(wsNameInput.text)
                                     wsNameInput.text = ""
                                     addWSDialog.close()
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    // ── Add Status Dialog ────────────────────────────────────
+    Popup {
+        id: addStatusDialog
+        anchors.centerIn: parent
+        width: 380; height: 240
+        modal: true; padding: 0
+        background: Rectangle { color: "transparent" }
+        closePolicy: Popup.CloseOnEscape
+
+        Rectangle {
+            anchors.fill: parent; color: nord1; border.color: nord15; border.width: 2
+            Rectangle { width: parent.width; height: 2; color: nord15; anchors.top: parent.top }
+
+            ColumnLayout {
+                anchors.fill: parent; anchors.margins: 28; spacing: 12
+
+                Text { text: "// NEW STATUS"; color: nord15; font.family: "Monaspace Krypton"; font.pixelSize: 11; font.letterSpacing: 3 }
+                Text { text: "name"; color: nord3; font.family: "Monaspace Krypton"; font.pixelSize: 11 }
+
+                Rectangle {
+                    Layout.fillWidth: true; height: 36
+                    color: nord0; border.color: statusNameInput.activeFocus ? nord8 : nord2; border.width: 1
+                    TextInput { id: statusNameInput; anchors.fill: parent; anchors.margins: 10; color: nord4; font.family: "Monaspace Krypton"; font.pixelSize: 13; verticalAlignment: TextInput.AlignVCenter }
+                }
+
+                Text { text: "color"; color: nord3; font.family: "Monaspace Krypton"; font.pixelSize: 11 }
+                Row {
+                    spacing: 8
+                    id: colorPicker
+                    property string selectedColor: "#5E81AC"
+
+                    Repeater {
+                        model: ["#5E81AC", "#88C0D0", "#A3BE8C", "#EBCB8B", "#D08770", "#BF616A", "#B48EAD"]
+                        Rectangle {
+                            width: 28; height: 28
+                            color: modelData
+                            border.color: colorPicker.selectedColor === modelData ? "white" : "transparent"
+                            border.width: 2
+                            MouseArea { anchors.fill: parent; onClicked: colorPicker.selectedColor = modelData }
+                        }
+                    }
+                }
+
+                Row {
+                    Layout.fillWidth: true; spacing: 8
+
+                    Rectangle {
+                        width: (parent.width - 8) / 2; height: 34
+                        color: csCancelArea.containsMouse ? nord2 : "transparent"; border.color: nord3; border.width: 1
+                        Behavior on color { ColorAnimation { duration: 100 } }
+                        Text { anchors.centerIn: parent; text: "CANCEL"; color: nord4; font.family: "Monaspace Krypton"; font.pixelSize: 11 }
+                        MouseArea { id: csCancelArea; anchors.fill: parent; hoverEnabled: true; onClicked: addStatusDialog.close() }
+                    }
+
+                    Rectangle {
+                        width: (parent.width - 8) / 2; height: 34
+                        color: csCreateArea.containsMouse ? nord15 : nord9
+                        Behavior on color { ColorAnimation { duration: 100 } }
+                        Text { anchors.centerIn: parent; text: "CREATE →"; color: nord0; font.family: "Monaspace Krypton"; font.pixelSize: 11; font.weight: Font.Bold }
+                        MouseArea {
+                            id: csCreateArea; anchors.fill: parent; hoverEnabled: true
+                            onClicked: {
+                                if (statusNameInput.text !== "" && backend.workspaces.length > statusWsCombo.currentIndex) {
+                                    var wsId = backend.workspaces[statusWsCombo.currentIndex].workspace_id
+                                    backend.create_status(wsId, statusNameInput.text, colorPicker.selectedColor)
+                                    statusNameInput.text = ""
+                                    addStatusDialog.close()
                                 }
                             }
                         }

@@ -12,15 +12,27 @@ Rectangle {
 
     signal cardClicked(int id)
 
-    width: parent ? parent.width : 240
+    // Drag поддержка
+    Drag.active: dragArea.drag.active
+    Drag.hotSpot.x: width / 2
+    Drag.hotSpot.y: height / 2
+    Drag.keys: ["task"]
+
+    // Сохраняем оригинальную позицию
+    property int currentStatusId: 0
+    property real origX: 0
+    property real origY: 0
+
+    width: 250
     height: cardCol.implicitHeight + 24
-    color: cardArea.containsMouse ? "#3B4252" : "#343A47"
+    color: dragArea.containsMouse ? "#3B4252" : "#343A47"
     border.color: {
         if (priority === 4) return "#BF616A"
         if (priority === 3) return "#D08770"
         if (priority === 2) return "#4C566A"
         return "#434C5E"
     }
+    anchors.margins: 4
     border.width: priority >= 3 ? 2 : 1
     radius: 0
 
@@ -112,9 +124,38 @@ Rectangle {
     }
 
     MouseArea {
-        id: cardArea
+        id: dragArea
         anchors.fill: parent
-        hoverEnabled: true
-        onClicked: card.cardClicked(taskId)
+        drag.target: card
+
+
+        // onPressed: {
+        //     card.origX = card.x
+        //     card.origY = card.y
+        //     card.Drag.active = true
+        // }
+
+        onReleased: {
+            var result = card.Drag.drop()
+            // Всегда возвращаем карточку на место — backend и Repeater сами обновят UI
+            card.x = card.origX
+            card.y = card.origY
+            card.Drag.active = false
+        }
+
+        onClicked: card.cardClicked(taskId)  // клик без drag
+    }
+
+    states: State {
+        when: dragArea.drag.active
+        ParentChange {
+            target: card
+            parent: root  // ← root это Board.qml Rectangle
+        }
+        PropertyChanges {
+            target: card
+            z: 999
+            opacity: 0.85
+        }
     }
 }

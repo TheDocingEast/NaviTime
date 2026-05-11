@@ -2,10 +2,11 @@ import QtQuick
 import QtQuick.Controls
 
 ApplicationWindow {
-    id: root
+    id: appWindow
     visible: true
     width: 1280
     height: 800
+    title: "NaviTime // Kanban"
     color: "#2E3440"
 
     FontLoader {
@@ -18,8 +19,8 @@ ApplicationWindow {
         source: Qt.resolvedUrl("LoginWindow.qml")
 
         onLoaded: {
-            item.width  = Qt.binding(() => root.width)
-            item.height = Qt.binding(() => root.height)
+            item.width  = Qt.binding(() => appWindow.width)
+            item.height = Qt.binding(() => appWindow.height)
         }
     }
 

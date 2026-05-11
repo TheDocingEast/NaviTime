@@ -117,9 +117,9 @@ Rectangle {
     function doLogin() {
         var result = backend.login(loginField.text, passField.text)
         if (result === "admin") {
-            root.push(Qt.resolvedUrl("AdminPanel.qml"))
+            appWindow.push(Qt.resolvedUrl("AdminPanel.qml"))
         } else if (result === "board") {
-            root.push(Qt.resolvedUrl("Board.qml"))
+            appWindow.push(Qt.resolvedUrl("Board.qml"))
         } else {
             errorText.text = "// incorrect login or password"
         }

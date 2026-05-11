@@ -24,7 +24,8 @@ class DBClient:
         return self._fetch("SELECT * FROM workspaces ORDER BY workspace_id")
 
     def get_workspace_by_id(self, workspace_id):
-        return self._fetch_one("SELECT * FROM workspaces WHERE workspace_id = %s", (workspace_id,))
+        return self._fetch_one(
+            "SELECT * FROM workspaces WHERE workspace_id = %s", (workspace_id,))
 
     def create_workspace(self, name):
         self._execute("INSERT INTO workspaces (name) VALUES (%s)", (name,))
@@ -35,9 +36,7 @@ class DBClient:
     # ── Users ────────────────────────────────────────────────
     def get_user_by_username(self, username):
         return self._fetch_one(
-            "SELECT * FROM users WHERE username = %s AND is_active = TRUE",
-            (username,)
-        )
+            "SELECT * FROM users WHERE username = %s AND is_active = TRUE", (username,))
 
     def get_all_users(self):
         return self._fetch("""
@@ -50,27 +49,40 @@ class DBClient:
     def get_users_by_workspace(self, workspace_id):
         return self._fetch(
             "SELECT * FROM users WHERE workspace_id = %s AND is_active = TRUE",
-            (workspace_id,)
-        )
+            (workspace_id,))
 
     def create_user(self, username, full_name, password, role, workspace_id=None):
         self._execute(
-            "INSERT INTO users (username, full_name, password, role, workspace_id) VALUES (%s, %s, %s, %s, %s)",
+            "INSERT INTO users (username, full_name, password, role, workspace_id) "
+            "VALUES (%s, %s, %s, %s, %s)",
             (username, full_name, password, role, workspace_id)
         )
 
     def set_user_active(self, user_id, is_active):
         self._execute(
-            "UPDATE users SET is_active = %s WHERE user_id = %s",
-            (is_active, user_id)
-        )
+            "UPDATE users SET is_active = %s WHERE user_id = %s", (is_active, user_id))
 
     # ── Statuses ─────────────────────────────────────────────
     def get_statuses(self, workspace_id):
-        return self._fetch(
-            "SELECT * FROM statuses WHERE workspace_id = %s ORDER BY position ASC",
+        if workspace_id and workspace_id > 0:
+            return self._fetch(
+                "SELECT * FROM statuses WHERE workspace_id = %s ORDER BY position ASC",
+                (workspace_id,))
+        return self._fetch("SELECT * FROM statuses ORDER BY workspace_id, position ASC")
+
+    def create_status(self, workspace_id, name, color):
+        result = self._fetch_one(
+            "SELECT COALESCE(MAX(position), 0) + 1 AS next_pos "
+            "FROM statuses WHERE workspace_id = %s",
             (workspace_id,)
         )
+        self._execute(
+            "INSERT INTO statuses (workspace_id, name, position, color) VALUES (%s, %s, %s, %s)",
+            (workspace_id, name, result["next_pos"], color)
+        )
+
+    def delete_status(self, status_id):
+        self._execute("DELETE FROM statuses WHERE status_id = %s", (status_id,))
 
     # ── Tasks ────────────────────────────────────────────────
     def get_tasks(self, workspace_id):
@@ -97,21 +109,25 @@ class DBClient:
             ORDER BY deadline ASC LIMIT 1
         """, (workspace_id,))
 
-    def create_task(self, title, description, workspace_id, status_id, creator_id, priority, deadline):
-        self._execute(
-            """INSERT INTO tasks (title, description, workspace_id, status_id, creator_id, priority, deadline)
-                VALUES (%s, %s, %s, %s, %s, %s, %s)""",
-            (title, description, workspace_id, status_id, creator_id, priority, deadline)
-        )
+    def create_task(self, title, description, workspace_id, status_id,
+                    creator_id, priority, deadline):
+        self._execute("""
+            INSERT INTO tasks
+                (title, description, workspace_id, status_id, creator_id, priority, deadline)
+            VALUES (%s, %s, %s, %s, %s, %s, %s)
+        """, (title, description, workspace_id, status_id, creator_id, priority, deadline))
 
     def update_task_status(self, task_id, status_id):
-        self._execute("UPDATE tasks SET status_id = %s WHERE task_id = %s", (status_id, task_id))
+        self._execute(
+            "UPDATE tasks SET status_id = %s WHERE task_id = %s", (status_id, task_id))
 
     def update_task_priority(self, task_id, priority):
-        self._execute("UPDATE tasks SET priority = %s WHERE task_id = %s", (priority, task_id))
+        self._execute(
+            "UPDATE tasks SET priority = %s WHERE task_id = %s", (priority, task_id))
 
     def soft_delete_task(self, task_id):
-        self._execute("UPDATE tasks SET is_deleted = TRUE WHERE task_id = %s", (task_id,))
+        self._execute(
+            "UPDATE tasks SET is_deleted = TRUE WHERE task_id = %s", (task_id,))
 
     # ── Comments ─────────────────────────────────────────────
     def get_comments(self, task_id):
@@ -127,21 +143,6 @@ class DBClient:
             "INSERT INTO comments (task_id, author_id, body) VALUES (%s, %s, %s)",
             (task_id, author_id, body)
         )
-
-    # ── Statuses ───────────────────────────────────
-    def create_status(self, workspace_id, name, color):
-        # position = следующий после максимального
-        result = self._fetch_one(
-            "SELECT COALESCE(MAX(position), 0) + 1 AS next_pos FROM statuses WHERE workspace_id = %s",
-            (workspace_id,)
-        )
-        self._execute(
-            "INSERT INTO statuses (workspace_id, name, position, color) VALUES (%s, %s, %s, %s)",
-            (workspace_id, name, result["next_pos"], color)
-        )
-
-    def delete_status(self, status_id):
-        self._execute("DELETE FROM statuses WHERE status_id = %s", (status_id,))
 
     # ── Helpers ──────────────────────────────────────────────
     def _fetch(self, query, params=None):

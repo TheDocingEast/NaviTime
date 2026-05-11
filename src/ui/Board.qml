@@ -18,13 +18,16 @@ Rectangle {
     readonly property color nord13: "#EBCB8B"
     readonly property color nord14: "#A3BE8C"
 
-    property string currentUser: backend.currentUser ?? "user"
-    property string currentRole: backend.currentRole ?? "employee"
-    property int currentWorkspace: backend.currentWorkspaceId ?? 1
-    property string currentWorkspaceName: backend.currentWorkspaceName ?? "Workspace"
+    property string currentUser: backend.currentUser
+    property string currentRole: backend.currentRole
+    property int currentWorkspace: backend.currentWorkspaceId
+    property string currentWorkspaceName: backend.currentWorkspaceName
     property int selectedPriority: 2
 
-    Component.onCompleted: backend.load_tasks(currentWorkspace)
+    Component.onCompleted: {
+        backend.load_tasks(currentWorkspace)
+        backend.load_statuses(currentWorkspace)
+    }
 
     // ── Top bar ──────────────────────────────────────────────
     Rectangle {
@@ -44,10 +47,36 @@ Rectangle {
             anchors.verticalCenter: parent.verticalCenter
             spacing: 16
 
-            Text { text: "//"; color: nord8; font.family: "Monaspace Krypton"; font.pixelSize: 14 }
-            Text { text: "KANBAN"; color: nord4; font.family: "Monaspace Krypton"; font.pixelSize: 14; font.weight: Font.Bold; font.letterSpacing: 2 }
-            Rectangle { width: 1; height: 20; color: nord2 }
-            Text { text: currentWorkspaceName.toUpperCase(); color: nord9; font.family: "Monaspace Krypton"; font.pixelSize: 12; font.letterSpacing: 1 }
+            Text {
+                text: "//"
+                color: nord8
+                font.family: "Monaspace Krypton"
+                font.pixelSize: 14
+                anchors.verticalCenter: parent.verticalCenter
+            }
+            Text {
+                text: "KANBAN"
+                color: nord4
+                font.family: "Monaspace Krypton"
+                font.pixelSize: 14
+                font.weight: Font.Bold
+                font.letterSpacing: 2
+                anchors.verticalCenter: parent.verticalCenter
+            }
+            Rectangle {
+                width: 1
+                height: 20
+                color: nord2
+                anchors.verticalCenter: parent.verticalCenter
+            }
+            Text {
+                text: currentWorkspaceName.toUpperCase()
+                color: nord9
+                font.family: "Monaspace Krypton"
+                font.pixelSize: 12
+                font.letterSpacing: 1
+                anchors.verticalCenter: parent.verticalCenter
+            }
         }
 
         Row {
@@ -56,7 +85,6 @@ Rectangle {
             anchors.verticalCenter: parent.verticalCenter
             spacing: 16
 
-            // Hot task indicator
             Rectangle {
                 visible: backend.hotTask !== null
                 height: 28
@@ -64,6 +92,8 @@ Rectangle {
                 color: "#3B2A2A"
                 border.color: nord11
                 border.width: 1
+                anchors.verticalCenter: parent.verticalCenter
+
 
                 Row {
                     id: hotTaskRow
@@ -82,23 +112,33 @@ Rectangle {
                 }
             }
 
-            Rectangle { width: 1; height: 20; color: nord2 }
+
+            Rectangle { width: 1; height: topBar.height - 14; color: nord2; anchors.verticalCenter: parent.verticalCenter }
 
             Text {
                 text: currentRole === "manager" ? "[manager]" : "[employee]"
                 color: currentRole === "manager" ? nord13 : nord9
                 font.family: "Monaspace Krypton"
-                font.pixelSize: 11
+                font.pixelSize: 13
+                anchors.verticalCenter: parent.verticalCenter
+                verticalAlignment: Text.AlignVCenter
             }
 
-            Text { text: currentUser; color: nord4; font.family: "Monaspace Krypton"; font.pixelSize: 12 }
+            Text {
+                text: currentUser;
+                color: nord4;
+                font.family: "Monaspace Krypton";
+                font.pixelSize: 14
+                anchors.verticalCenter: parent.verticalCenter
+                verticalAlignment: Text.AlignVCenter
+            }
 
-            // New task button (manager only)
             Rectangle {
                 width: 110
                 height: 28
                 color: newTaskArea.containsMouse ? nord10 : nord9
                 Behavior on color { ColorAnimation { duration: 100 } }
+                anchors.verticalCenter: parent.verticalCenter
 
                 Text {
                     anchors.centerIn: parent
@@ -120,36 +160,36 @@ Rectangle {
                             return
                         }
                         noStatusError.visible = false
+                        newTaskDialog.selectedStatus = backend.statuses[0].status_id
                         newTaskDialog.open()
                     }
                 }
-
             }
-            // Рядом с кнопкой добавь:
+
             Text {
                 id: noStatusError
                 visible: false
-                text: "// ошибка: нет статусов в воркспейсе"
+                text: "// error: no statuses"
                 color: "#BF616A"
                 font.family: "Monaspace Krypton"
                 font.pixelSize: 11
                 anchors.verticalCenter: parent.verticalCenter
             }
 
-            // Logout
             Rectangle {
                 width: 28; height: 28
                 color: logoutArea.containsMouse ? "#3B2A2A" : "transparent"
                 border.color: nord3
                 border.width: 1
                 Behavior on color { ColorAnimation { duration: 100 } }
+                anchors.verticalCenter: parent.verticalCenter
 
                 Text { anchors.centerIn: parent; text: "⏻"; color: nord11; font.pixelSize: 14 }
                 MouseArea {
                     id: logoutArea
                     anchors.fill: parent
                     hoverEnabled: true
-                    onClicked: stack.pop()
+                    onClicked: appWindow.pop()
                 }
             }
         }
@@ -169,14 +209,15 @@ Rectangle {
             model: backend.statuses
 
             Rectangle {
-                width: (root.width - 40 - 16 * (backend.statuses.length - 1)) / backend.statuses.length
+                id: column
+                width: backend.statuses.length > 0
+                    ? (root.width - 40 - 16 * (backend.statuses.length - 1)) / backend.statuses.length
+                    : root.width - 40
                 height: parent.height
                 color: nord1
                 border.color: nord2
                 border.width: 1
-                radius: 0
 
-                // Column header
                 Rectangle {
                     id: colHeader
                     width: parent.width
@@ -209,7 +250,6 @@ Rectangle {
                             width: countText.implicitWidth + 10
                             height: 16
                             color: nord3
-                            radius: 0
 
                             Text {
                                 id: countText
@@ -223,7 +263,6 @@ Rectangle {
                     }
                 }
 
-                // Tasks list
                 ScrollView {
                     anchors.top: colHeader.bottom
                     anchors.bottom: parent.bottom
@@ -231,18 +270,22 @@ Rectangle {
                     anchors.right: parent.right
                     anchors.margins: 10
                     anchors.topMargin: 10
-                    clip: true
                     ScrollBar.horizontal.policy: ScrollBar.AlwaysOff
 
                     Column {
                         width: parent.width
+                        anchors.top: colHeader.bottom
+                        anchors.bottom: parent.bottom
+                        anchors.left: parent.left
+                        anchors.right: parent.right
+
                         spacing: 8
 
                         Repeater {
                             model: backend.tasks.filter(t => t.status_id === modelData.status_id)
 
                             TaskCard {
-                                width: parent.width
+                                width: 250
                                 taskTitle: modelData.title
                                 taskDesc: modelData.description ?? ""
                                 deadline: modelData.deadline ?? ""
@@ -257,6 +300,28 @@ Rectangle {
                             }
                         }
                     }
+
+                }
+                DropArea {
+                    anchors.top: colHeader.bottom  // только под хедером
+                    anchors.bottom: parent.bottom
+                    anchors.left: parent.left
+                    anchors.right: parent.right
+                    keys: ["task"]
+                    z: 10
+
+                    Rectangle {
+                        anchors.fill: parent
+                        color: parent.containsDrag ? Qt.rgba(1, 1, 1, 0.05) : "transparent"
+                        border.color: parent.containsDrag ? "#88C0D0" : "transparent"
+                        border.width: 2
+                    }
+
+                    onDropped: function(drop) {
+                        var tid = drop.source.taskId
+                        backend.update_task_status(tid, modelData.status_id)
+                    }
+                    onEntered: console.log("enter:", modelData.name, "status_id:", modelData.status_id)
                 }
             }
         }
@@ -289,7 +354,7 @@ Rectangle {
         id: taskDetailDialog
         anchors.centerIn: parent
         width: 480
-        height: 500
+        height: 520
         modal: true
         padding: 0
         background: Rectangle { color: "transparent" }
@@ -300,7 +365,6 @@ Rectangle {
             color: nord1
             border.color: nord8
             border.width: 2
-            radius: 0
 
             Rectangle { width: parent.width; height: 2; color: nord8; anchors.top: parent.top }
             Rectangle { width: 8; height: 8; color: nord8; anchors.top: parent.top; anchors.right: parent.right }
@@ -311,13 +375,7 @@ Rectangle {
                 anchors.margins: 28
                 spacing: 14
 
-                Text {
-                    text: "// TASK"
-                    color: nord8
-                    font.family: "Monaspace Krypton"
-                    font.pixelSize: 11
-                    font.letterSpacing: 3
-                }
+                Text { text: "// TASK"; color: nord8; font.family: "Monaspace Krypton"; font.pixelSize: 11; font.letterSpacing: 3 }
 
                 Text {
                     text: backend.selectedTask ? backend.selectedTask.title : ""
@@ -346,16 +404,10 @@ Rectangle {
                     rowSpacing: 8
 
                     Text { text: "deadline:"; color: nord3; font.family: "Monaspace Krypton"; font.pixelSize: 12 }
-                    Text {
-                        text: backend.selectedTask ? (backend.selectedTask.deadline ?? "—") : "—"
-                        color: nord9; font.family: "Monaspace Krypton"; font.pixelSize: 12
-                    }
+                    Text { text: backend.selectedTask ? (backend.selectedTask.deadline ?? "—") : "—"; color: nord9; font.family: "Monaspace Krypton"; font.pixelSize: 12 }
 
                     Text { text: "assignee:"; color: nord3; font.family: "Monaspace Krypton"; font.pixelSize: 12 }
-                    Text {
-                        text: backend.selectedTask ? (backend.selectedTask.assignee_name ?? "—") : "—"
-                        color: nord9; font.family: "Monaspace Krypton"; font.pixelSize: 12
-                    }
+                    Text { text: backend.selectedTask ? (backend.selectedTask.assignee_name ?? "—") : "—"; color: nord9; font.family: "Monaspace Krypton"; font.pixelSize: 12 }
 
                     Text { text: "priority:"; color: nord3; font.family: "Monaspace Krypton"; font.pixelSize: 12 }
                     Text {
@@ -380,8 +432,7 @@ Rectangle {
 
                 Rectangle { Layout.fillWidth: true; height: 1; color: nord2 }
 
-                // Comments
-                Text { text: "// comment"; color: nord8; font.family: "Monaspace Krypton"; font.pixelSize: 11; font.letterSpacing: 2 }
+                Text { text: "// comments"; color: nord8; font.family: "Monaspace Krypton"; font.pixelSize: 11; font.letterSpacing: 2 }
 
                 ScrollView {
                     Layout.fillWidth: true
@@ -406,7 +457,6 @@ Rectangle {
                     }
                 }
 
-                // Add comment
                 Row {
                     Layout.fillWidth: true
                     spacing: 8
@@ -457,10 +507,8 @@ Rectangle {
                     }
                 }
 
-                // Manager actions
                 Row {
                     spacing: 8
-                    visible: currentRole === "manager"
 
                     Rectangle {
                         width: 120; height: 32
@@ -501,11 +549,13 @@ Rectangle {
         id: newTaskDialog
         anchors.centerIn: parent
         width: 440
-        height: 480
+        height: 560
         modal: true
         padding: 0
         background: Rectangle { color: "transparent" }
         closePolicy: Popup.CloseOnEscape
+
+        property int selectedStatus: backend.statuses.length > 0 ? backend.statuses[0].status_id : 0
 
         Rectangle {
             anchors.fill: parent
@@ -518,11 +568,10 @@ Rectangle {
             ColumnLayout {
                 anchors.fill: parent
                 anchors.margins: 28
-                spacing: 12
+                spacing: 10
 
                 Text { text: "// NEW TASK"; color: nord8; font.family: "Monaspace Krypton"; font.pixelSize: 11; font.letterSpacing: 3 }
 
-                // Title
                 Text { text: "title"; color: nord3; font.family: "Monaspace Krypton"; font.pixelSize: 11 }
                 Rectangle {
                     Layout.fillWidth: true; height: 38
@@ -535,10 +584,9 @@ Rectangle {
                     }
                 }
 
-                // Description
                 Text { text: "description"; color: nord3; font.family: "Monaspace Krypton"; font.pixelSize: 11 }
                 Rectangle {
-                    Layout.fillWidth: true; height: 70
+                    Layout.fillWidth: true; height: 60
                     color: nord0; border.color: nord2; border.width: 1
                     TextEdit {
                         id: newDesc
@@ -548,42 +596,74 @@ Rectangle {
                     }
                 }
 
-                // Priority
-                Text { text: "priority"; color: nord3; font.family: "Monaspace Krypton"; font.pixelSize: 11 }
-                Row {
-                    spacing: 8
-                    property int selected: 2
+                Text { text: "status"; color: nord3; font.family: "Monaspace Krypton"; font.pixelSize: 11 }
+                Flow {
+                    Layout.fillWidth: true
+                    spacing: 6
 
                     Repeater {
-                        id: priorityRepeater
+                        model: backend.statuses
+
+                        Rectangle {
+                            width: 100; height: 28
+                            color: newTaskDialog.selectedStatus === modelData.status_id
+                                   ? (modelData.color ?? nord10) : nord2
+                            border.color: modelData.color ?? nord10
+                            border.width: 1
+                            Behavior on color { ColorAnimation { duration: 80 } }
+
+                            Text {
+                                anchors.centerIn: parent
+                                text: modelData.name
+                                color: newTaskDialog.selectedStatus === modelData.status_id ? nord0 : nord4
+                                font.family: "Monaspace Krypton"; font.pixelSize: 10
+                            }
+                            MouseArea {
+                                anchors.fill: parent
+                                onClicked: newTaskDialog.selectedStatus = modelData.status_id
+                            }
+                        }
+                    }
+                }
+
+                Text { text: "priority"; color: nord3; font.family: "Monaspace Krypton"; font.pixelSize: 11 }
+                Row {
+                    spacing: 6
+                    id: priorityRow
+
+                    Repeater {
                         model: [
-                            { val: 1, label: "low",     color: "#4C566A" },
-                            { val: 2, label: "medium",    color: "#EBCB8B" },
-                            { val: 3, label: "high",    color: "#D08770" },
-                            { val: 4, label: "critical",       color: "#BF616A" },
+                            { val: 1, label: "low",      color: "#4C566A" },
+                            { val: 2, label: "medium",   color: "#EBCB8B" },
+                            { val: 3, label: "high",     color: "#D08770" },
+                            { val: 4, label: "critical", color: "#BF616A" },
                         ]
 
                         Rectangle {
-                            width: 80; height: 28
-                            color: parent.selected === modelData.val ? modelData.color : nord2
+                            width: 78; height: 28
+                            color: priorityRow.selectedVal === modelData.val ? modelData.color : nord2
                             border.color: modelData.color; border.width: 1
                             Behavior on color { ColorAnimation { duration: 80 } }
 
                             Text {
                                 anchors.centerIn: parent
                                 text: modelData.label
-                                color: parent.parent.selected === modelData.val ? nord0 : nord4
+                                color: priorityRow.selectedVal === modelData.val ? nord0 : nord4
                                 font.family: "Monaspace Krypton"; font.pixelSize: 10
                             }
                             MouseArea {
                                 anchors.fill: parent
-                                onClicked: { parent.parent.selected = modelData.val; selectedPriority = modelData.val }
+                                onClicked: {
+                                    priorityRow.selectedVal = modelData.val
+                                    selectedPriority = modelData.val
+                                }
                             }
                         }
                     }
+
+                    property int selectedVal: 2
                 }
 
-                // Deadline
                 Text { text: "deadline (YYYY-MM-DD)"; color: nord3; font.family: "Monaspace Krypton"; font.pixelSize: 11 }
                 Rectangle {
                     Layout.fillWidth: true; height: 38
@@ -616,24 +696,16 @@ Rectangle {
                         width: (parent.width - 8) / 2; height: 36
                         color: createArea.containsMouse ? nord10 : nord9
                         Behavior on color { ColorAnimation { duration: 100 } }
-                        Text {
-                            anchors.centerIn: parent
-                            text: "CREATE →"
-                            color: nord0
-                            font.family: "Monaspace Krypton"
-                            font.pixelSize: 11
-                            font.weight: Font.Bold
-                            font.letterSpacing: 1
-                        }
+                        Text { anchors.centerIn: parent; text: "CREATE →"; color: nord0; font.family: "Monaspace Krypton"; font.pixelSize: 11; font.weight: Font.Bold; font.letterSpacing: 1 }
                         MouseArea {
                             id: createArea; anchors.fill: parent; hoverEnabled: true
                             onClicked: {
-                                if (newTitle.text !== "") {
+                                if (newTitle.text !== "" && newTaskDialog.selectedStatus !== 0) {
                                     backend.create_task(
                                         newTitle.text,
                                         newDesc.text,
                                         backend.currentWorkspaceId,
-                                        newTaskDialog.selectedStatus,  // ← вместо statuses[0]
+                                        newTaskDialog.selectedStatus,
                                         selectedPriority,
                                         newDeadline.text.replace(/-/g, "").trim() !== "" ? newDeadline.text : ""
                                     )
