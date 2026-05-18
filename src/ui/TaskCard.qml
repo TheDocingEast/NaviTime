@@ -8,6 +8,7 @@ Rectangle {
     property string deadline: ""
     property int priority: 2
     property string assignee: ""
+    property string workspaceName: ""
     property int taskId: -1
 
     signal cardClicked(int id)
@@ -68,6 +69,24 @@ Rectangle {
             font.weight: Font.Medium
             wrapMode: Text.Wrap
             Layout.fillWidth: true
+        }
+
+        Rectangle {
+            visible: workspaceName !== ""
+            width: wsTagText.implicitWidth + 12
+            height: 18
+            color: nord2
+            border.color: nord3; border.width: 1
+
+            Text {
+                id: wsTagText
+                anchors.centerIn: parent
+                text: workspaceName.toUpperCase()
+                color: nord9
+                font.family: "Monaspace Krypton"
+                font.pixelSize: 9
+                font.letterSpacing: 1
+            }
         }
 
         Text {

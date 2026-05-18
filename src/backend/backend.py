@@ -11,6 +11,8 @@ class Backend(QObject):
     commentsChanged     = Signal()
     hotTaskChanged      = Signal()
     userInfoChanged     = Signal()
+    workspaceUsersChanged = Signal()
+    workspaceFilterChanged = Signal()
 
     def __init__(self):
         super().__init__()
@@ -24,6 +26,8 @@ class Backend(QObject):
         self._users                  = []
         self._workspaces             = []
         self._statuses               = []
+        self._workspace_users = []
+        self._workspace_filter_id = -1
         self._selected_task          = None
         self._selected_task_comments = []
         self._hot_task               = None
@@ -88,11 +92,18 @@ class Backend(QObject):
     # ── Tasks ────────────────────────────────────────────────
     @Slot(int)
     def load_tasks(self, workspace_id):
-        self._tasks = [dict(t) for t in self.db.get_tasks(workspace_id)]
-        for t in self._tasks:
-            if t.get("deadline"):
-                t["deadline"] = str(t["deadline"])[:10]
-        hot = self.db.get_hot_task(workspace_id)
+        if self._current_role == "manager":
+            self._reload_tasks_for_manager()
+            # hot task тоже по всем — берём ближайший дедлайн глобально
+            hot = self.db.get_hot_task_global()
+        else:
+            rows = self.db.get_tasks(workspace_id)
+            self._tasks = [dict(t) for t in rows]
+            for t in self._tasks:
+                if t.get("deadline"):
+                    t["deadline"] = str(t["deadline"])[:10]
+            hot = self.db.get_hot_task(workspace_id)
+
         self._hot_task = dict(hot) if hot else None
         self.tasksChanged.emit()
         self.hotTaskChanged.emit()
@@ -105,11 +116,22 @@ class Backend(QObject):
     def hotTask(self):
         return self._hot_task
 
-    @Slot(str, str, int, int, int, str)
-    def create_task(self, title, description, workspace_id, status_id, priority, deadline):
+    @Slot(int)
+    def load_workspace_users(self, workspace_id):
+        self._workspace_users = [dict(u) for u in self.db.get_users_by_workspace(workspace_id)]
+        self.workspaceUsersChanged.emit()
+
+    @Property(list, notify=workspaceUsersChanged)
+    def workspaceUsers(self):
+        return self._workspace_users
+
+    @Slot(str, str, int, int, int, str, int)
+    def create_task(self, title, description, workspace_id, status_id, priority, deadline, assignee_id):
         self.db.create_task(
             title, description, workspace_id, status_id,
-            self._current_user_id, priority,
+            assignee_id if assignee_id > 0 else self._current_user_id,
+            self._current_user_id,
+            priority,
             deadline if deadline and deadline.replace("-", "").strip() else None
         )
         self.load_tasks(workspace_id)
@@ -219,6 +241,30 @@ class Backend(QObject):
     def delete_workspace(self, workspace_id):
         self.db.delete_workspace(workspace_id)
         self.load_workspaces()
+
+    @Property(int, notify=workspaceFilterChanged)
+    def workspaceFilterId(self):
+        return self._workspace_filter_id
+
+    @Slot(int)
+    def setWorkspaceFilter(self, workspace_id):
+        self._workspace_filter_id = workspace_id
+        self.workspaceFilterChanged.emit()
+        self._reload_tasks_for_manager()
+        # Перегружаем статусы под выбранный воркспейс
+        if workspace_id != -1:
+            self.load_statuses(workspace_id)
+
+    def _reload_tasks_for_manager(self):
+        if self._workspace_filter_id == -1:
+            rows = self.db.get_all_tasks()
+        else:
+            rows = self.db.get_tasks_by_workspace(self._workspace_filter_id)
+        self._tasks = [dict(t) for t in rows]
+        for t in self._tasks:
+            if t.get("deadline"):
+                t["deadline"] = str(t["deadline"])[:10]
+        self.tasksChanged.emit()
 
     def close(self):
         self.db.close()

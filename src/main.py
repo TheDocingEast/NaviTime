@@ -1,37 +1,71 @@
 import sys
 import os
+from pathlib import Path
+
 from PySide6.QtGui import QGuiApplication
 from PySide6.QtQml import QQmlApplicationEngine
+from PySide6.QtCore import QUrl, QFileSystemWatcher, QTimer
 
-print("Starting...")
+# ── Пути ──────────────────────────────────────────────────────────────────────
+if hasattr(sys, 'frozen') or '__compiled__' in dir():
+    BASE_DIR = Path(sys.executable).parent
+else:
+    BASE_DIR = Path(__file__).parent
 
-from backend.backend import Backend
-print("Backend imported")
+UI_DIR  = BASE_DIR / "ui"
+QML_MAIN = UI_DIR / "Main.qml"
+
+# ── Hot reload ─────────────────────────────────────────────────────────────────
+class HotReloader:
+    def __init__(self, engine: QQmlApplicationEngine):
+        self.engine = engine
+        self.watcher = QFileSystemWatcher()
+
+        for f in UI_DIR.glob("*.qml"):
+            self.watcher.addPath(str(f))
+        self.watcher.fileChanged.connect(self._on_changed)
+
+        self._timer = QTimer()
+        self._timer.setSingleShot(True)
+        self._timer.setInterval(200)
+        self._timer.timeout.connect(self._reload)
+
+    def _on_changed(self, path: str):
+        self.watcher.addPath(path)   # vim/PyCharm пересоздают файл — переподписываемся
+        print(f"[reload] {Path(path).name}")
+        self._timer.start()
+
+    def _reload(self):
+        self.engine.clearComponentCache()
+        for obj in self.engine.rootObjects():
+            obj.deleteLater()
+        self.engine.load(QUrl.fromLocalFile(str(QML_MAIN)))
+
+# ── Приложение ─────────────────────────────────────────────────────────────────
+print(f"BASE_DIR : {BASE_DIR}")
+print(f"QML_MAIN : {QML_MAIN}")
+print(f"QML exists: {QML_MAIN.exists()}")
 
 app = QGuiApplication(sys.argv)
-print("App created")
-
 engine = QQmlApplicationEngine()
-print("Engine created")
 
+# Backend
 try:
+    from backend.backend import Backend
     backend = Backend()
-    print("Backend created")
+    engine.rootContext().setContextProperty("backend", backend)
+    print("Backend OK")
 except Exception as e:
     print(f"Backend error: {e}")
-    backend = None
 
-if backend:
-    engine.rootContext().setContextProperty("backend", backend)
+# Загрузка QML — обязательно через QUrl, иначе сломаются относительные импорты
+engine.load(QUrl.fromLocalFile(str(QML_MAIN)))
 
-qml_path = os.path.join(os.path.dirname(__file__), "ui", "Main.qml")
-print(f"Loading QML: {qml_path}")
-print(f"File exists: {os.path.exists(qml_path)}")
-engine.load(qml_path)
+if not engine.rootObjects():
+    print("QML failed to load")
+    sys.exit(1)
 
-root_objects = engine.rootObjects()
-print(f"Root objects: {root_objects}")
+# Hot reload только в dev-режиме
+_reloader = HotReloader(engine) if os.getenv("DEV") else None
 
-if not root_objects:
-    print("QML failed to load completely")
 sys.exit(app.exec())

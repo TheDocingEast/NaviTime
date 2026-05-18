@@ -197,7 +197,9 @@ Rectangle {
             }
 
             ScrollView {
-                Layout.fillWidth: true; Layout.fillHeight: true; clip: true
+                Layout.fillWidth: true
+                Layout.fillHeight: true
+                clip: true
                 ScrollBar.horizontal.policy: ScrollBar.AlwaysOff
 
                 Column {
@@ -207,14 +209,16 @@ Rectangle {
                         model: backend.users
 
                         Rectangle {
-                            width: parent.width; height: 38
+                            implicitWidth: parent.width;
+                            height: 38
                             color: rowArea.containsMouse ? nord2 : (index % 2 === 0 ? nord1 : "#363D4E")
                             Behavior on color { ColorAnimation { duration: 80 } }
 
                             Row {
-                                anchors.fill: parent; anchors.leftMargin: 12
+                                anchors.fill: parent
+                                spacing: 10
 
-                                Text { width: 50;  height: parent.height; text: modelData.user_id;   color: nord3; font.family: "Monaspace Krypton"; font.pixelSize: 12; verticalAlignment: Text.AlignVCenter }
+                                Text { width: 50;  height: parent.height; text: modelData.user_id;   color: nord3; font.family: "Monaspace Krypton"; font.pixelSize: 12; verticalAlignment: Text.AlignVCenter; horizontalAlignment: Text.AlignHCenter }
                                 Text { width: 150; height: parent.height; text: modelData.username;  color: nord4; font.family: "Monaspace Krypton"; font.pixelSize: 12; verticalAlignment: Text.AlignVCenter }
                                 Text { width: 180; height: parent.height; text: modelData.full_name; color: nord4; font.family: "Monaspace Krypton"; font.pixelSize: 12; verticalAlignment: Text.AlignVCenter; elide: Text.ElideRight }
                                 Text {
@@ -226,14 +230,18 @@ Rectangle {
                                 Text { width: 120; height: parent.height; text: modelData.workspace_name ?? "—"; color: nord3; font.family: "Monaspace Krypton"; font.pixelSize: 12; verticalAlignment: Text.AlignVCenter }
 
                                 Rectangle {
-                                    width: 70; height: 20; anchors.verticalCenter: parent.verticalCenter
+                                    width: 70
+                                    height: 20
+                                    anchors.verticalCenter: parent.verticalCenter
                                     color: modelData.is_active ? "#1A2E1A" : "#2E1A1A"
                                     border.color: modelData.is_active ? nord14 : nord11; border.width: 1
                                     Text { anchors.centerIn: parent; text: modelData.is_active ? "ACTIVE" : "INACTIVE"; color: modelData.is_active ? nord14 : nord11; font.family: "Monaspace Krypton"; font.pixelSize: 9; font.letterSpacing: 1 }
                                 }
 
                                 Rectangle {
-                                    width: 80; height: 24; anchors.verticalCenter: parent.verticalCenter; anchors.leftMargin: 8
+                                    width: 80
+                                    height: 24
+                                    anchors.verticalCenter: parent.verticalCenter
                                     color: toggleArea.containsMouse ? (modelData.is_active ? "#3B2A2A" : "#1A2E1A") : "transparent"
                                     border.color: modelData.is_active ? nord11 : nord14; border.width: 1
                                     Behavior on color { ColorAnimation { duration: 80 } }

@@ -27,6 +27,9 @@ Rectangle {
     Component.onCompleted: {
         backend.load_tasks(currentWorkspace)
         backend.load_statuses(currentWorkspace)
+        if (currentRole === "manager") {
+            backend.load_workspaces()   // нужны для фильтра
+        }
     }
 
     // ── Top bar ──────────────────────────────────────────────
@@ -133,9 +136,66 @@ Rectangle {
                 verticalAlignment: Text.AlignVCenter
             }
 
+            Row {
+                visible: currentRole === "manager"
+                anchors.verticalCenter: parent.verticalCenter
+                spacing: 0
+
+                // Кнопка "ALL"
+                Rectangle {
+                    width: 42; height: 28
+                    color: backend.workspaceFilterId === -1 ? nord9 : "transparent"
+                    border.color: nord3; border.width: 1
+                    Behavior on color { ColorAnimation { duration: 80 } }
+
+                    Text {
+                        anchors.centerIn: parent
+                        text: "ALL"
+                        color: backend.workspaceFilterId === -1 ? nord0 : nord4
+                        font.family: "Monaspace Krypton"; font.pixelSize: 10
+                        font.letterSpacing: 1
+                    }
+                    MouseArea {
+                        anchors.fill: parent
+                        onClicked: backend.setWorkspaceFilter(-1)
+                    }
+                }
+
+                Repeater {
+                    model: backend.workspaces
+
+                    Rectangle {
+                        width: wsLabel.implicitWidth + 16; height: 28
+                        color: backend.workspaceFilterId === modelData.workspace_id ? nord9 : "transparent"
+                        border.color: nord3
+                        border.width: 1
+                        // Левая граница убирает дублирование — соседние кнопки смыкаются
+                        Rectangle { width: 1; height: parent.height; color: nord3 }
+                        Behavior on color { ColorAnimation { duration: 80 } }
+
+                        Text {
+                            id: wsLabel
+                            anchors.centerIn: parent
+                            text: modelData.name.toUpperCase()
+                            color: backend.workspaceFilterId === modelData.workspace_id ? nord0 : nord4
+                            font.family: "Monaspace Krypton"; font.pixelSize: 10
+                            font.letterSpacing: 1
+                        }
+                        MouseArea {
+                            anchors.fill: parent
+                            onClicked: backend.setWorkspaceFilter(modelData.workspace_id)
+                        }
+                    }
+                }
+
+                // Правая граница группы
+                Rectangle { width: 1; height: 28; color: nord3 }
+            }
+
             Rectangle {
-                width: 110
-                height: 28
+                width: 110; height: 28
+                opacity: currentRole === "manager" && backend.workspaceFilterId === -1 ? 0.35 : 1.0
+                Behavior on opacity { NumberAnimation { duration: 150 } }
                 color: newTaskArea.containsMouse ? nord10 : nord9
                 Behavior on color { ColorAnimation { duration: 100 } }
                 anchors.verticalCenter: parent.verticalCenter
@@ -155,12 +215,19 @@ Rectangle {
                     hoverEnabled: true
                     onClicked: {
                         backend.load_statuses(backend.currentWorkspaceId)
+                        // Для менеджера — грузим юзеров выбранного воркспейса фильтра
+                        var wsId = currentRole === "manager"
+                            ? backend.workspaceFilterId
+                            : backend.currentWorkspaceId
+                        backend.load_workspace_users(wsId)
+
                         if (backend.statuses.length === 0) {
                             noStatusError.visible = true
                             return
                         }
                         noStatusError.visible = false
                         newTaskDialog.selectedStatus = backend.statuses[0].status_id
+                        newTaskDialog.selectedAssignee = 0
                         newTaskDialog.open()
                     }
                 }
@@ -196,136 +263,169 @@ Rectangle {
     }
 
     // ── Columns ──────────────────────────────────────────────
-    Row {
+    Item {
         anchors.top: topBar.bottom
         anchors.bottom: statusBar.top
         anchors.left: parent.left
         anchors.right: parent.right
-        anchors.margins: 20
-        anchors.topMargin: 16
-        spacing: 16
 
-        Repeater {
-            model: backend.statuses
+        // Канбан — только когда выбран конкретный воркспейс
+        Row {
+            visible: currentRole !== "manager" || backend.workspaceFilterId !== -1
+            anchors.fill: parent
+            anchors.margins: 20
+            anchors.topMargin: 16
+            spacing: 16
 
-            Rectangle {
-                id: column
-                width: backend.statuses.length > 0
-                    ? (root.width - 40 - 16 * (backend.statuses.length - 1)) / backend.statuses.length
-                    : root.width - 40
-                height: parent.height
-                color: nord1
-                border.color: nord2
-                border.width: 1
-
-                Rectangle {
-                    id: colHeader
-                    width: parent.width
-                    height: 36
-                    color: nord2
-                    anchors.top: parent.top
-
-                    Rectangle {
-                        width: 3; height: parent.height
-                        color: modelData.color ?? nord8
-                        anchors.left: parent.left
-                    }
-
-                    Row {
-                        anchors.left: parent.left
-                        anchors.leftMargin: 16
-                        anchors.verticalCenter: parent.verticalCenter
-                        spacing: 10
-
-                        Text {
-                            text: modelData.name.toUpperCase()
-                            color: nord4
-                            font.family: "Monaspace Krypton"
-                            font.pixelSize: 11
-                            font.letterSpacing: 2
-                            font.weight: Font.Bold
-                        }
-
-                        Rectangle {
-                            width: countText.implicitWidth + 10
-                            height: 16
-                            color: nord3
-
-                            Text {
-                                id: countText
-                                anchors.centerIn: parent
-                                text: backend.tasks.filter(t => t.status_id === modelData.status_id).length
-                                color: nord4
-                                font.family: "Monaspace Krypton"
-                                font.pixelSize: 10
-                            }
-                        }
-                    }
+            Repeater {
+                model: {
+                    if (currentRole !== "manager")
+                        return backend.statuses
+                    return backend.statuses.filter(s => s.workspace_id === backend.workspaceFilterId)
                 }
 
-                ScrollView {
-                    anchors.top: colHeader.bottom
-                    anchors.bottom: parent.bottom
-                    anchors.left: parent.left
-                    anchors.right: parent.right
-                    anchors.margins: 10
-                    anchors.topMargin: 10
-                    ScrollBar.horizontal.policy: ScrollBar.AlwaysOff
+                Rectangle {
+                    id: column
+                    width: backend.statuses.length > 0
+                        ? (root.width - 40 - 16 * (backend.statuses.length - 1)) / backend.statuses.length
+                        : root.width - 40
+                    height: parent.height
+                    color: nord1
+                    border.color: nord2
+                    border.width: 1
 
-                    Column {
+                    Rectangle {
+                        id: colHeader
                         width: parent.width
-                        anchors.top: colHeader.bottom
-                        anchors.bottom: parent.bottom
-                        anchors.left: parent.left
-                        anchors.right: parent.right
+                        height: 36
+                        color: nord2
+                        anchors.top: parent.top
 
-                        spacing: 8
+                        Rectangle {
+                            width: 3; height: parent.height
+                            color: modelData.color ?? nord8
+                            anchors.left: parent.left
+                        }
 
-                        Repeater {
-                            model: backend.tasks.filter(t => t.status_id === modelData.status_id)
+                        Row {
+                            anchors.left: parent.left
+                            anchors.leftMargin: 16
+                            anchors.verticalCenter: parent.verticalCenter
+                            spacing: 10
 
-                            TaskCard {
-                                width: 250
-                                taskTitle: modelData.title
-                                taskDesc: modelData.description ?? ""
-                                deadline: modelData.deadline ?? ""
-                                priority: modelData.priority
-                                assignee: modelData.assignee_name ?? ""
-                                taskId: modelData.task_id
+                            Text {
+                                text: modelData.name.toUpperCase()
+                                color: nord4
+                                font.family: "Monaspace Krypton"
+                                font.pixelSize: 11
+                                font.letterSpacing: 2
+                                font.weight: Font.Bold
+                            }
 
-                                onCardClicked: (id) => {
-                                    backend.selectTask(id)
-                                    taskDetailDialog.open()
+                            Rectangle {
+                                width: countText.implicitWidth + 10
+                                height: 16
+                                color: nord3
+
+                                Text {
+                                    id: countText
+                                    anchors.centerIn: parent
+                                    text: backend.tasks.filter(t => t.status_id === modelData.status_id).length
+                                    color: nord4
+                                    font.family: "Monaspace Krypton"
+                                    font.pixelSize: 10
                                 }
                             }
                         }
                     }
 
+                    ScrollView {
+                        anchors.top: colHeader.bottom
+                        anchors.bottom: parent.bottom
+                        anchors.left: parent.left
+                        anchors.right: parent.right
+                        anchors.margins: 10
+                        anchors.topMargin: 10
+                        ScrollBar.horizontal.policy: ScrollBar.AlwaysOff
+
+                        Column {
+                            width: parent.width
+                            anchors.top: colHeader.bottom
+                            anchors.bottom: parent.bottom
+                            anchors.left: parent.left
+                            anchors.right: parent.right
+
+                            spacing: 8
+
+                            Repeater {
+                                model: backend.tasks.filter(t => t.status_id === modelData.status_id)
+
+                                TaskCard {
+                                    width: 260
+                                    taskTitle: modelData.title
+                                    taskDesc: modelData.description ?? ""
+                                    deadline: modelData.deadline ?? ""
+                                    priority: modelData.priority
+                                    assignee: modelData.assignee_name ?? ""
+                                    taskId: modelData.task_id
+                                    workspaceName: currentRole === "manager" ? (modelData.workspace_name ?? "") : ""
+
+                                    onCardClicked: (id) => {
+                                        backend.selectTask(id)
+                                        taskDetailDialog.open()
+                                    }
+                                }
+                            }
+                        }
+
+                    }
+                    DropArea {
+                        anchors.top: colHeader.bottom  // только под хедером
+                        anchors.bottom: parent.bottom
+                        anchors.left: parent.left
+                        anchors.right: parent.right
+                        keys: ["task"]
+                        z: 10
+
+                        Rectangle {
+                            anchors.fill: parent
+                            color: parent.containsDrag ? Qt.rgba(1, 1, 1, 0.05) : "transparent"
+                            border.color: parent.containsDrag ? "#88C0D0" : "transparent"
+                            border.width: 2
+                        }
+
+                        onDropped: function(drop) {
+                            var tid = drop.source.taskId
+                            backend.update_task_status(tid, modelData.status_id)
+                        }
+                        onEntered: console.log("enter:", modelData.name, "status_id:", modelData.status_id)
+                    }
                 }
-                DropArea {
-                    anchors.top: colHeader.bottom  // только под хедером
-                    anchors.bottom: parent.bottom
-                    anchors.left: parent.left
-                    anchors.right: parent.right
-                    keys: ["task"]
-                    z: 10
+            }
+            }
+            // Заглушка при ALL
+            Column {
+                visible: currentRole === "manager" && backend.workspaceFilterId === -1
+                anchors.centerIn: parent
+                spacing: 8
 
-                    Rectangle {
-                        anchors.fill: parent
-                        color: parent.containsDrag ? Qt.rgba(1, 1, 1, 0.05) : "transparent"
-                        border.color: parent.containsDrag ? "#88C0D0" : "transparent"
-                        border.width: 2
-                    }
-
-                    onDropped: function(drop) {
-                        var tid = drop.source.taskId
-                        backend.update_task_status(tid, modelData.status_id)
-                    }
-                    onEntered: console.log("enter:", modelData.name, "status_id:", modelData.status_id)
+                Text {
+                    anchors.horizontalCenter: parent.horizontalCenter
+                    text: "// select department to view board"
+                    color: nord3
+                    font.family: "Monaspace Krypton"
+                    font.pixelSize: 13
+                    font.letterSpacing: 2
+                }
+                Text {
+                    anchors.horizontalCenter: parent.horizontalCenter
+                    text: backend.tasks.length + " tasks total across all departments"
+                    color: nord2
+                    font.family: "Monaspace Krypton"
+                    font.pixelSize: 11
                 }
             }
         }
-    }
 
     // ── Status bar ───────────────────────────────────────────
     Rectangle {
@@ -556,6 +656,7 @@ Rectangle {
         closePolicy: Popup.CloseOnEscape
 
         property int selectedStatus: backend.statuses.length > 0 ? backend.statuses[0].status_id : 0
+        property int selectedAssignee: 0
 
         Rectangle {
             anchors.fill: parent
@@ -602,7 +703,11 @@ Rectangle {
                     spacing: 6
 
                     Repeater {
-                        model: backend.statuses
+                        model: {
+                                if (currentRole !== "manager" || backend.workspaceFilterId === -1)
+                                    return backend.statuses
+                                return backend.statuses.filter(s => s.workspace_id === backend.workspaceFilterId)
+                            }
 
                         Rectangle {
                             width: 100; height: 28
@@ -677,6 +782,55 @@ Rectangle {
                     }
                 }
 
+                Text { text: "assignee"; color: nord3; font.family: "Monaspace Krypton"; font.pixelSize: 11 }
+                Flow {
+                    Layout.fillWidth: true
+                    spacing: 6
+
+                    // Кнопка "unassigned"
+                    Rectangle {
+                        width: 90; height: 28
+                        color: newTaskDialog.selectedAssignee === 0 ? nord10 : nord2
+                        border.color: nord10; border.width: 1
+                        Behavior on color { ColorAnimation { duration: 80 } }
+
+                        Text {
+                            anchors.centerIn: parent
+                            text: "unassigned"
+                            color: newTaskDialog.selectedAssignee === 0 ? nord0 : nord4
+                            font.family: "Monaspace Krypton"; font.pixelSize: 10
+                        }
+                        MouseArea {
+                            anchors.fill: parent
+                            onClicked: newTaskDialog.selectedAssignee = 0
+                        }
+                    }
+
+                    Repeater {
+                        model: backend.workspaceUsers
+
+                        Rectangle {
+                            width: Math.max(90, usernameText.implicitWidth + 20)
+                            height: 28
+                            color: newTaskDialog.selectedAssignee === modelData.user_id ? nord9 : nord2
+                            border.color: nord9; border.width: 1
+                            Behavior on color { ColorAnimation { duration: 80 } }
+
+                            Text {
+                                id: usernameText
+                                anchors.centerIn: parent
+                                text: modelData.username
+                                color: newTaskDialog.selectedAssignee === modelData.user_id ? nord0 : nord4
+                                font.family: "Monaspace Krypton"; font.pixelSize: 10
+                            }
+                            MouseArea {
+                                anchors.fill: parent
+                                onClicked: newTaskDialog.selectedAssignee = modelData.user_id
+                            }
+                        }
+                    }
+                }
+
                 Item { Layout.fillHeight: true }
 
                 Row {
@@ -701,17 +855,22 @@ Rectangle {
                             id: createArea; anchors.fill: parent; hoverEnabled: true
                             onClicked: {
                                 if (newTitle.text !== "" && newTaskDialog.selectedStatus !== 0) {
+                                    var wsId = currentRole === "manager"
+                                        ? backend.workspaceFilterId
+                                        : backend.currentWorkspaceId
                                     backend.create_task(
                                         newTitle.text,
                                         newDesc.text,
-                                        backend.currentWorkspaceId,
+                                        wsId,                          // ← правильный workspace
                                         newTaskDialog.selectedStatus,
                                         selectedPriority,
-                                        newDeadline.text.replace(/-/g, "").trim() !== "" ? newDeadline.text : ""
+                                        newDeadline.text.replace(/-/g, "").trim() !== "" ? newDeadline.text : "",
+                                        newTaskDialog.selectedAssignee
                                     )
                                     newTitle.text = ""
                                     newDesc.text = ""
                                     newDeadline.text = ""
+                                    newTaskDialog.selectedAssignee = 0  // ← сброс
                                     newTaskDialog.close()
                                 }
                             }

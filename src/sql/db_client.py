@@ -87,9 +87,10 @@ class DBClient:
     # ── Tasks ────────────────────────────────────────────────
     def get_tasks(self, workspace_id):
         return self._fetch("""
-            SELECT t.*, u.username AS assignee_name
+            SELECT t.*, u.username AS assignee_name, w.name AS workspace_name
             FROM tasks t
             LEFT JOIN users u ON t.assignee_id = u.user_id
+            LEFT JOIN workspaces w ON t.workspace_id = w.workspace_id
             WHERE t.workspace_id = %s AND t.is_deleted = FALSE
             ORDER BY t.priority DESC, t.created_at ASC
         """, (workspace_id,))
@@ -102,20 +103,22 @@ class DBClient:
             WHERE t.task_id = %s
         """, (task_id,))
 
-    def get_hot_task(self, workspace_id):
+    def get_hot_task_global(self):
         return self._fetch_one("""
-            SELECT * FROM tasks
-            WHERE workspace_id = %s AND deadline IS NOT NULL AND is_deleted = FALSE
-            ORDER BY deadline ASC LIMIT 1
-        """, (workspace_id,))
+            SELECT t.*, w.name AS workspace_name
+            FROM tasks t
+            LEFT JOIN workspaces w ON t.workspace_id = w.workspace_id
+            WHERE t.deadline IS NOT NULL AND t.is_deleted = FALSE
+            ORDER BY t.deadline ASC LIMIT 1
+        """)
 
-    def create_task(self, title, description, workspace_id, status_id,
+    def create_task(self, title, description, workspace_id, status_id, assignee_id,
                     creator_id, priority, deadline):
         self._execute("""
             INSERT INTO tasks
-                (title, description, workspace_id, status_id, creator_id, priority, deadline)
-            VALUES (%s, %s, %s, %s, %s, %s, %s)
-        """, (title, description, workspace_id, status_id, creator_id, priority, deadline))
+                (title, description, workspace_id, status_id, assignee_id, creator_id, priority, deadline)
+            VALUES (%s, %s, %s, %s, %s, %s, %s, %s)
+        """, (title, description, workspace_id, status_id, assignee_id, creator_id, priority, deadline))
 
     def update_task_status(self, task_id, status_id):
         self._execute(
@@ -128,6 +131,27 @@ class DBClient:
     def soft_delete_task(self, task_id):
         self._execute(
             "UPDATE tasks SET is_deleted = TRUE WHERE task_id = %s", (task_id,))
+
+    def get_all_tasks(self):
+        return self._fetch("""
+            SELECT t.*, u.username AS assignee_name, w.name AS workspace_name
+            FROM tasks t
+            LEFT JOIN users u ON t.assignee_id = u.user_id
+            LEFT JOIN workspaces w ON t.workspace_id = w.workspace_id
+            WHERE t.is_deleted = FALSE
+            ORDER BY t.priority DESC, t.created_at ASC
+        """)
+
+    def get_tasks_by_workspace(self, workspace_id):
+        """Фильтр по конкретному отделу — для менеджера"""
+        return self._fetch("""
+            SELECT t.*, u.username AS assignee_name, w.name AS workspace_name
+            FROM tasks t
+            LEFT JOIN users u ON t.assignee_id = u.user_id
+            LEFT JOIN workspaces w ON t.workspace_id = w.workspace_id
+            WHERE t.workspace_id = %s AND t.is_deleted = FALSE
+            ORDER BY t.priority DESC, t.created_at ASC
+        """, (workspace_id,))
 
     # ── Comments ─────────────────────────────────────────────
     def get_comments(self, task_id):
