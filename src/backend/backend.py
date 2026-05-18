@@ -16,12 +16,7 @@ class Backend(QObject):
 
     def __init__(self):
         super().__init__()
-        self.db = DBClient(
-            dbname="navitime",
-            user="navitime",
-            password="ghio#21d",
-            host="85.209.135.157"
-        )
+        self.db = DBClient()
         self._tasks                  = []
         self._users                  = []
         self._workspaces             = []
