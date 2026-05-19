@@ -112,6 +112,15 @@ class DBClient:
             ORDER BY t.deadline ASC LIMIT 1
         """)
 
+    def get_hot_task(self, workspace_id):
+        return self._fetch_one("""
+            SELECT t.*, w.name AS workspace_name
+            FROM tasks t
+            LEFT JOIN workspaces w ON t.workspace_id = w.workspace_id
+            WHERE t.workspace_id = %s AND t.deadline IS NOT NULL AND t.is_deleted = FALSE
+            ORDER BY t.deadline ASC LIMIT 1
+        """, (workspace_id,))
+
     def create_task(self, title, description, workspace_id, status_id, assignee_id,
                     creator_id, priority, deadline):
         self._execute("""
